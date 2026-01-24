@@ -9,3 +9,5 @@ instance/
 *.sqlite3
 *.db
 help.txt
+*.env
+*.service
