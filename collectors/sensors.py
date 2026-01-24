@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from Freenove_DHT import DHT      
 
 URL = "http://localhost:5000/api/sensors"
-INTERVAL = 2
+INTERVAL = 5
 MAX_BACKOFF = 60
 DHT_PIN = 17 
 dht = DHT(DHT_PIN)
