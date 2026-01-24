@@ -8,3 +8,4 @@ venv/
 instance/
 *.sqlite3
 *.db
+help.txt
