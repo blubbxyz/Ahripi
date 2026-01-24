@@ -1,0 +1,15 @@
+[Unit]
+Description=RPi Dashboard Network Collector
+After=network.target rpi-dashboard-app.service
+Wants=rpi-dashboard-app.service
+
+[Service]
+Type=simple
+User=blubb
+WorkingDirectory=/home/blubb/rpi-dashboard
+ExecStart=/home/blubb/rpi-dashboard/venv/bin/python collectors/network.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
