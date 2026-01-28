@@ -33,6 +33,7 @@ STATE = {
     "fun": {"quote": None, "timestamp": None}
 }
 
+
 # ----- API ENDPOINTS -----
 
 # Sensors
@@ -131,6 +132,12 @@ def site2_static(path):
 def site2_files(path):
     return send_from_directory(WEB2_DIR, path)
 
+# ---- BUTTON ACTION ----
+@app.post("/api/button/coinflip")
+def button_action():
+    data = request.get_json(silent=True) or {}
+    print("coinflip_requested:", data)
+    return {"status": "ok"}
 
 # ----- RUN SERVER -----
 if __name__ == "__main__":

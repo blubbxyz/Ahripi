@@ -42,9 +42,15 @@ def post_payload(session: requests.Session, payload: dict) -> None:
     resp.raise_for_status()
 
 
+def coinflip() -> str:
+    """Simulate a coin flip and return 'heads' or 'tails'."""
+    return "heads" if random.randint(0, 1) == 0 else "tails"
+
+
 def main() -> None:
     quotes = read_lines("quotes.txt")
     insults = read_lines("insults.txt")
+    coinflip_results = coinflip()
 
     session = requests.Session()
     backoff = 1
@@ -54,6 +60,7 @@ def main() -> None:
             payload = {
                 "quote": random.choice(quotes),
                 "insult": random.choice(insults),
+                "coinflip": coinflip_results,
                 "timestamp": datetime.now(ZoneInfo("Europe/Berlin")).isoformat(),
             }
 
