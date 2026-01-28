@@ -11,3 +11,4 @@ instance/
 help.txt
 *.env
 *.service
+.env.*

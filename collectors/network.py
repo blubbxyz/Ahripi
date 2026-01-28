@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 from datetime import datetime
@@ -6,7 +7,8 @@ from zoneinfo import ZoneInfo
 import requests
 import psutil
 
-URL = "http://localhost:5000/api/network"
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
+URL = f"{BASE_URL}/api/network"
 INTERVAL = 1
 MAX_BACKOFF = 60
 

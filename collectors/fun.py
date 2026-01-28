@@ -1,3 +1,4 @@
+import os
 import time
 import random
 import logging
@@ -6,7 +7,8 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-URL = "http://localhost:5000/api/fun"
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
+URL = f"{BASE_URL}/api/fun"
 INTERVAL = 20
 MAX_BACKOFF = 60 
 

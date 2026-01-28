@@ -1,3 +1,4 @@
+import os
 import requests
 import time
 from datetime import datetime
@@ -5,7 +6,8 @@ import logging
 from zoneinfo import ZoneInfo
 from Freenove_DHT import DHT      
 
-URL = "http://localhost:5000/api/sensors"
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
+URL = f"{BASE_URL}/api/sensors"
 INTERVAL = 5
 MAX_BACKOFF = 60
 DHT_PIN = 17 

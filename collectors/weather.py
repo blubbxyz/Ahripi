@@ -1,12 +1,14 @@
 import asyncio
 import logging
 from datetime import datetime
+import os
 from zoneinfo import ZoneInfo
 
 import requests
 import python_weather
 
-URL = "http://localhost:5000/api/weather"
+BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
+URL = f"{BASE_URL}/api/weather"
 CITY = "Schwerin"
 
 INTERVAL = 600

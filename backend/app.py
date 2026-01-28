@@ -141,5 +141,6 @@ def button_action():
 
 # ----- RUN SERVER -----
 if __name__ == "__main__":
-    print("Dashboard running on http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.getenv("PORT", "5000"))
+    print(f"Dashboard running on http://localhost:{port}")
+    app.run(host="0.0.0.0", port=port)
