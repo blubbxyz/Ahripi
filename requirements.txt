@@ -8,7 +8,7 @@ idna==3.3
 lgpio==0.2.2.0
 pigpio==1.78
 pycryptodomex==3.11.0
-python-apt==2.6.0
+# python-apt  (install via apt)
 requests==2.28.1
 rpi-keyboard-config==1.0
 rpi-lgpio==0.6
