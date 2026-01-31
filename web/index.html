@@ -20,16 +20,15 @@
             justify-content: center;     /* centers cards inside */
         }
         .card-center {
-                display: flex;
-                flex-direction: column;   /* 👈 THIS */
-                justify-content: center;
-                align-items: center;
-                min-height: 120px;
-
-                background: #222;
-                padding: 15px;
-                border-radius: 8px;
-                flex: 1 1 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 120px;
+            background: #222;
+            padding: 15px;
+            border-radius: 8px;
+            flex: 1 1 300px;
         }
         .card {
             background: #222;
@@ -51,7 +50,7 @@
             user-select: none;
             -webkit-user-select: none;
             touch-action: manipulation;
-            }
+        }
         .button-62:before {
             content: "";
             background: linear-gradient(
@@ -78,19 +77,13 @@
             animation: glowing-button-85 20s linear infinite;
             transition: opacity 0.3s ease-in-out;
             border-radius: 10px;
-            }
+        }
 
-            @keyframes glowing-button-85 {
-            0% {
-                background-position: 0 0;
-            }
-            50% {
-                background-position: 400% 0;
-            }
-            100% {
-                background-position: 0 0;
-            }
-            }
+        @keyframes glowing-button-85 {
+            0% { background-position: 0 0; }
+            50% { background-position: 400% 0; }
+            100% { background-position: 0 0; }
+        }
 
         .button-62:after {
             z-index: -1;
@@ -102,7 +95,8 @@
             left: 0;
             top: 0;
             border-radius: 10px;
-            }
+        }
+
         h1 {
             font-size: 40px;
             font-family: Calibri, sans-serif;
@@ -110,83 +104,109 @@
             text-align: center;
             background: linear-gradient(45deg, red, orange, yellow, green, blue, indigo, violet);
             background-size: 400% 400%;
-            color: #fff; /* Fallback for browsers that do not support background-clip: text */
-            /* Note: background-clip: text is not supported in Firefox and some other browsers */
+            color: #fff;
             background-clip: text;
             -webkit-background-clip: text;
-            /* -webkit-text-fill-color is non-standard and works only in WebKit-based browsers */
             -webkit-text-fill-color: transparent;
-            animation: rainbow 5s linear infinite;
             animation: rainbow 5s linear infinite;
         }
 
         @keyframes rainbow {
-            0% {
-                background-position: 0% 50%;
-            }
-            100% {
-                background-position: 100% 50%;
-            }
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
         }
     </style>
 </head>
-</head>
-<body>
 
+<body>
 <h1>RPi Dashboard</h1>
 
 <div class="container">
-<div class="card">
-    <h2>System</h2>
-    <h4>status: <span id="system-status-indicator">🔴</span></h4>
-    <p>CPU Usage: <span id="cpu">--</span> %</p>
-    <p>RAM Usage: <span id="ram">--</span> %</p>
-    <p>RAM speed: <span id="ram_speed">--</span> mhz</p>
-    <p>temperature: <span id="core_temp">--</span> °C</p>
-</div>
+    <div class="card">
+        <h2>System</h2>
+        <p>CPU Usage: <span id="cpu">--</span> %</p>
+        <p>RAM Usage: <span id="ram">--</span> %</p>
+        <p>RAM speed: <span id="ram_speed">--</span> mhz</p>
+        <p>temperature: <span id="core_temp">--</span> °C</p>
+    </div>
 
-<div class="card-center">
+    <div class="card-center">
         <button class="button-62" onclick="window.location.href='https://www.pinode.dev/site2';">
             Go to another website
         </button>
+    </div>
 
+    <div class="card">
+        <h2>Network</h2>
+        <p>RX: <span id="rx">--</span> kbps</p>
+        <p>TX: <span id="tx">--</span> kbps</p>
+    </div>
 
-</div>
+    <div class="card">
+        <h2>Funny thingys</h2>
+        <h4>Random Insult:</h4>
+        <p><span id="insult">--</span></p>
+        <h4>Random Quote:</h4>
+        <p><span id="quote">--</span></p>
+    </div>
 
-<div class="card">
-  <h2>Network</h2>
-  <h4>status: <span id="network-status-indicator">🔴</span></h4>
-  <p>RX: <span id="rx">--</span> kbps</p>
-  <p>TX: <span id="tx">--</span> kbps</p>
-</div>
+    <div class="card">
+        <h2>Weather in <span id="city">--</span></h2>
+        <h4>Today (<span id="weather_current_date">--</span>)</h4>
+        <p>
+            Temperature: <span id="weather_temp">--</span> °C
+            (H: <span id="current_high">--</span>° L: <span id="current_low">--</span>°)
+        </p>
+        <p>Condition: <span id="weather_condition">--</span></p>
 
-<div class="card">
-    <h2>Funny thingys</h2>
-    <h4>Random Insult:</h4>
-    <p> <span id="insult">--</span> </p>
-    <h4>Random Quote:</h4>
-    <p> <span id="quote">--</span> </p>
-</div>
+        <h4>Forecast - Next 2 Days</h4>
+        <p>
+            <strong><span id="forecast_day1_date">Day 1</span>:</strong>
+            <span id="forecast_day1_temp">--</span> °C
+            (H: <span id="forecast_day1_high">--</span>° L: <span id="forecast_day1_low">--</span>°)
+        </p>
+        <p>
+            <strong><span id="forecast_day2_date">Day 2</span>:</strong>
+            <span id="forecast_day2_temp">--</span> °C
+            (H: <span id="forecast_day2_high">--</span>° L: <span id="forecast_day2_low">--</span>°)
+        </p>
+    </div>
 
-<div class="card">
-    <h2>Weather in <span id="city">--</span></h2>
-    <h4>Today (<span id="weather_current_date">--</span>)</h4>
-    <p>Temperature: <span id="weather_temp">--</span> °C (H: <span id="current_high">--</span>° L: <span id="current_low">--</span>°)</p>
-    <p>Condition: <span id="weather_condition">--</span></p>
-    
-    <h4>Forecast - Next 2 Days</h4>
-    <p><strong><span id="forecast_day1_date">Day 1</span>:</strong> <span id="forecast_day1_temp">--</span> °C (H: <span id="forecast_day1_high">--</span>° L: <span id="forecast_day1_low">--</span>°)</p>
-    <p><strong><span id="forecast_day2_date">Day 2</span>:</strong> <span id="forecast_day2_temp">--</span> °C (H: <span id="forecast_day2_high">--</span>° L: <span id="forecast_day2_low">--</span>°)</p>
-</div>
+    <div class="card">
+        <h2>External Sensors (in the pi's room)</h2>
+        <p>humidity: <span id="humidity">--</span> %</p>
+        <p>temperature: <span id="temp">--</span> °C</p>
+    </div>
 
-<div class="card">
-    <h2>External Sensors (in the pi's room)</h2>
-      <h4>status: <span id="sensors-status-indicator">🔴</span></h4>
-    <p>humidity: <span id="humidity">--</span> %</p>
-    <p>temperature: <span id="temp">--</span> °C</p>
+    <div class="card">
+        <h2>backend status:</h2>
+        <h4>system: <span id="system-status-indicator">🔴</span></h4>
+        <h4>sensors: <span id="sensors-status-indicator">🔴</span></h4>
+        <h4>network: <span id="network-status-indicator">🔴</span></h4>
+        <h4>weather: <span id="weather-status-indicator">🔴</span></h4>
+        <h4>fun: <span id="fun-status-indicator">🔴</span></h4>
+    </div>
 </div>
 
 <script>
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;            // IMPORTANT: prevents dashboard from crashing
+    el.textContent = value;
+}
+
+function getStatus(timestamp) {
+    if (!timestamp) return "stale";
+    const lastUpdate = new Date(timestamp);
+    const now = new Date();
+    const diffSeconds = (now - lastUpdate) / 1000;
+    return diffSeconds < 15 ? "fresh" : "stale";
+}
+
+function getStatusColor(status) {
+    return status === "fresh" ? "🟢" : "🔴";
+}
+
 async function update() {
     try {
         const sensors = await fetch("/api/sensors").then(r => r.json());
@@ -194,61 +214,61 @@ async function update() {
         const network = await fetch("/api/network").then(r => r.json());
         const fun     = await fetch("/api/fun").then(r => r.json());
         const weather = await fetch("/api/weather").then(r => r.json());
-        
-        const systemStatus = system.timestamp ? getStatus(system.timestamp) : "stale";
-        const networkStatus = network.timestamp ? getStatus(network.timestamp) : "stale";
-        const sensorsStatus = sensors.timestamp ? getStatus(sensors.timestamp) : "stale";
 
-        document.getElementById("cpu").textContent = system.cpu || "--";
-        document.getElementById("ram").textContent = system.ram || "--";
-        document.getElementById("ram_speed").textContent = system.ram_speed || "--";
-        document.getElementById("core_temp").textContent = system.core_temp || "--";
-        document.getElementById("rx").textContent = network.rx_kbps || "--";
-        document.getElementById("tx").textContent = network.tx_kbps || "--";
-        document.getElementById("quote").textContent = fun.quote || "--";
-        document.getElementById("insult").textContent = fun.insult || "--"; 
-        
-        document.getElementById("city").textContent = weather.city || "--";
-        document.getElementById("weather_temp").textContent = (weather.outside_temp !== null && weather.outside_temp !== undefined) ? weather.outside_temp : "--";
-        document.getElementById("weather_condition").textContent = weather.condition || "--";
-        document.getElementById("weather_current_date").textContent = weather.current_date || "--";
-        document.getElementById("current_high").textContent = (weather.current_high_temp !== null && weather.current_high_temp !== undefined) ? weather.current_high_temp : "--";
-        document.getElementById("current_low").textContent = (weather.current_low_temp !== null && weather.current_low_temp !== undefined) ? weather.current_low_temp : "--";
-        
-        document.getElementById("forecast_day1_date").textContent = weather.forecast_day1_date || "Day 1";
-        document.getElementById("forecast_day1_temp").textContent = (weather.forecast_day1_avg_temp !== null && weather.forecast_day1_avg_temp !== undefined) ? weather.forecast_day1_avg_temp : "--";
-        document.getElementById("forecast_day1_high").textContent = (weather.forecast_day1_high_temp !== null && weather.forecast_day1_high_temp !== undefined) ? weather.forecast_day1_high_temp : "--";
-        document.getElementById("forecast_day1_low").textContent = (weather.forecast_day1_low_temp !== null && weather.forecast_day1_low_temp !== undefined) ? weather.forecast_day1_low_temp : "--";
-        
-        document.getElementById("forecast_day2_date").textContent = weather.forecast_day2_date || "Day 2";
-        document.getElementById("forecast_day2_temp").textContent = (weather.forecast_day2_avg_temp !== null && weather.forecast_day2_avg_temp !== undefined) ? weather.forecast_day2_avg_temp : "--";
-        document.getElementById("forecast_day2_high").textContent = (weather.forecast_day2_high_temp !== null && weather.forecast_day2_high_temp !== undefined) ? weather.forecast_day2_high_temp : "--";
-        document.getElementById("forecast_day2_low").textContent = (weather.forecast_day2_low_temp !== null && weather.forecast_day2_low_temp !== undefined) ? weather.forecast_day2_low_temp : "--";
-        
-        document.getElementById("system-status-indicator").textContent = getStatusColor(systemStatus);
-        document.getElementById("network-status-indicator").textContent = getStatusColor(networkStatus);
-        document.getElementById("sensors-status-indicator").textContent = getStatusColor(sensorsStatus);
-        document.getElementById("humidity").textContent = sensors.humidity || "--";
-        document.getElementById("temp").textContent = sensors.temp || "--";
+        const systemStatus  = system.timestamp  ? getStatus(system.timestamp)   : "stale";
+        const networkStatus = network.timestamp ? getStatus(network.timestamp)  : "stale";
+        const sensorsStatus = sensors.timestamp ? getStatus(sensors.timestamp)  : "stale";
+        const funStatus     = fun.timestamp     ? getStatus(fun.timestamp)      : "stale";
+        const weatherStatus = weather.timestamp ? getStatus(weather.timestamp)  : "stale";
+
+        // System
+        setText("cpu",       system.cpu ?? "--");
+        setText("ram",       system.ram ?? "--");
+        setText("ram_speed", system.ram_speed ?? "--");
+        setText("core_temp", system.core_temp ?? "--");
+
+        // Network
+        setText("rx", network.rx_kbps ?? "--");
+        setText("tx", network.tx_kbps ?? "--");
+
+        // Fun
+        setText("quote",    fun.quote ?? "--");
+        setText("insult",   fun.insult ?? "--");
+        setText("coinflip", fun.coinflip ?? "--"); // safe even if element removed
+
+        // Weather
+        setText("city",                 weather.city ?? "--");
+        setText("weather_temp",         (weather.outside_temp ?? "--"));
+        setText("weather_condition",    weather.condition ?? "--");
+        setText("weather_current_date", weather.current_date ?? "--");
+
+        setText("current_high", (weather.current_high_temp ?? "--"));
+        setText("current_low",  (weather.current_low_temp ?? "--"));
+
+        setText("forecast_day1_date", weather.forecast_day1_date ?? "Day 1");
+        setText("forecast_day1_temp", (weather.forecast_day1_avg_temp ?? "--"));
+        setText("forecast_day1_high", (weather.forecast_day1_high_temp ?? "--"));
+        setText("forecast_day1_low",  (weather.forecast_day1_low_temp ?? "--"));
+
+        setText("forecast_day2_date", weather.forecast_day2_date ?? "Day 2");
+        setText("forecast_day2_temp", (weather.forecast_day2_avg_temp ?? "--"));
+        setText("forecast_day2_high", (weather.forecast_day2_high_temp ?? "--"));
+        setText("forecast_day2_low",  (weather.forecast_day2_low_temp ?? "--"));
+
+        // Status indicators
+        setText("system-status-indicator",  getStatusColor(systemStatus));
+        setText("network-status-indicator", getStatusColor(networkStatus));
+        setText("sensors-status-indicator", getStatusColor(sensorsStatus));
+        setText("weather-status-indicator", getStatusColor(weatherStatus));
+        setText("fun-status-indicator",     getStatusColor(funStatus));
+
+        // Sensors
+        setText("humidity", sensors.humidity ?? "--");
+        setText("temp",     sensors.temp ?? "--");
+
     } catch (error) {
         console.error("Error fetching dashboard data:", error);
     }
-}
-
-function getStatus(timestamp) {
-    if (!timestamp) {
-        console.log("No timestamp received");
-        return "stale";
-    }
-    const lastUpdate = new Date(timestamp);
-    const now = new Date();
-    const diffSeconds = (now - lastUpdate) / 1000;
-    console.log("Timestamp:", timestamp, "Diff seconds:", diffSeconds);
-    return diffSeconds < 15 ? "fresh" : "stale";  // 15 second threshold
-}
-
-function getStatusColor(status) {
-    return status === "fresh" ? "🟢" : "🔴";
 }
 
 setInterval(update, 1000);
