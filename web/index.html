@@ -36,6 +36,34 @@
             border-radius: 8px;
             flex: 1 1 300px;
         }
+
+        /* ========= Admin panel (fixed on the right) ========= */
+        :root { --admin-panel-w: 260px; }
+
+        /* Leave room for the fixed admin panel so it doesn't sit on top of the cards */
+        @media (min-width: 1100px) {
+          body.admin-on .container {
+            padding-right: calc(var(--admin-panel-w) + 24px);
+          }
+        }
+
+        .admin-panel {
+          position: fixed;
+          top: 70px;                 /* starts under the top-right Admin button */
+          right: 12px;
+          width: var(--admin-panel-w);
+          max-height: calc(100vh - 90px);
+          overflow: auto;
+          z-index: 9997;             /* sits below the login modal (9999) */
+        }
+
+        .admin-panel .button-60,
+        .admin-panel .button-44 {
+          width: 100%;
+          margin-top: 8px;
+        }
+        /* =============================================== */
+
         .button-62 {
             font-size: 18px;
             padding: 1em 3em;
@@ -96,6 +124,76 @@
             top: 0;
             border-radius: 10px;
         }
+        .button-44 {
+          background: #e62143;
+          border-radius: 11px;
+          box-sizing: border-box;
+          color: #fff;
+          cursor: pointer;
+          display: flex;
+          font-family: Mija,-apple-system,BlinkMacSystemFont,Roboto,"Roboto Slab","Droid Serif","Segoe UI",system-ui,Arial,sans-serif;
+          font-size: 1.15em;
+          font-weight: 700;
+          justify-content: center;
+          line-height: 33.4929px;
+          padding: .8em 1em;
+          text-align: center;
+          text-decoration: none;
+          text-decoration-skip-ink: auto;
+          text-shadow: rgba(0, 0, 0, .3) 1px 1px 1px;
+          text-underline-offset: 1px;
+          transition: all .2s ease-in-out;
+          user-select: none;
+          -webkit-user-select: none;
+          touch-action: manipulation;
+          width: 100%;
+          word-break: break-word;
+          border: 0;
+        }
+
+        .button-44:active,
+        .button-44:focus {
+          border-bottom-style: none;
+          border-color: #dadada;
+          box-shadow: rgba(0, 0, 0, .3) 0 3px 3px inset;
+          outline: 0;
+        }
+
+        .button-44:hover {
+          border-bottom-style: none;
+          border-color: #dadada;
+        }
+
+        .button-60 {
+          align-items: center;
+          appearance: none;
+          background-color: #fff;
+          border: 1px solid #dbdbdb;
+          border-radius: .375em;
+          box-shadow: none;
+          box-sizing: border-box;
+          color: #363636;
+          cursor: pointer;
+          display: inline-flex;
+          font-family: BlinkMacSystemFont,-apple-system,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Fira Sans","Droid Sans","Helvetica Neue",Helvetica,Arial,sans-serif;
+          font-size: 1rem;
+          height: 2.5em;
+          justify-content: center;
+          line-height: 1.5;
+          padding: calc(.5em - 1px) 1em;
+          position: relative;
+          text-align: center;
+          user-select: none;
+          -webkit-user-select: none;
+          touch-action: manipulation;
+          vertical-align: top;
+          white-space: nowrap;
+        }
+
+        .button-60:active { border-color: #4a4a4a; outline: 0; }
+        .button-60:focus { border-color: #485fc7; outline: 0; }
+        .button-60:hover { border-color: #b5b5b5; }
+        .button-60:focus:not(:active) { box-shadow: rgba(72, 95, 199, .25) 0 0 0 .125em; }
 
         h1 {
             font-size: 40px;
@@ -115,81 +213,187 @@
             0% { background-position: 0% 50%; }
             100% { background-position: 100% 50%; }
         }
+
+        .topbar {
+          position: fixed;
+          top: 12px;
+          right: 12px;
+          z-index: 9999;
+        }
+
+        .admin-only { display: none; }
+        .admin-on .admin-only { display: block; }
+
+        /* A super minimal modal: backdrop + centered box */
+        .modal-backdrop {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.6);
+          z-index: 9998;
+        }
+        .modal {
+          display: none;
+          position: fixed;
+          top: 15%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: min(420px, 90vw);
+          background: #222;
+          border: 1px solid #333;
+          border-radius: 12px;
+          padding: 16px;
+          z-index: 9999;
+        }
+        .modal input {
+          width: 100%;
+          padding: 10px;
+          border-radius: 8px;
+          border: 1px solid #333;
+          background: #111;
+          color: #eee;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 10px;
+          margin-top: 12px;
+          justify-content: flex-end;
+        }
     </style>
 </head>
 
 <body>
-<h1>RPi Dashboard</h1>
-
-<div class="container">
-    <div class="card">
-        <h2>System</h2>
-        <p>CPU Usage: <span id="cpu">--</span> %</p>
-        <p>RAM Usage: <span id="ram">--</span> %</p>
-        <p>RAM speed: <span id="ram_speed">--</span> mhz</p>
-        <p>temperature: <span id="core_temp">--</span> °C</p>
+    <div class="topbar">
+        <button class="button-62" id="adminBtn" style="padding:0.6em 1.2em; font-size:14px;">Admin</button>
     </div>
 
-    <div class="card-center">
-        <button class="button-62" onclick="window.location.href='/site2';">
-            NEWEST FEATURE HERE        </button>
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal" id="adminModal">
+        <h3 style="margin:0 0 10px 0;">Admin Login</h3>
+        <input id="adminPassword" type="password" placeholder="password" />
+        <div id="adminMsg" style="margin-top:8px; opacity:0.85;"></div>
+        <div class="modal-actions">
+            <button class="button-62" id="adminCancel" style="padding:0.6em 1.2em; font-size:14px;">Cancel</button>
+            <button class="button-62" id="adminLogin" style="padding:0.6em 1.2em; font-size:14px;">Login</button>
+        </div>
     </div>
 
-    <div class="card">
-        <h2>Network</h2>
-        <p>RX: <span id="rx">--</span> kbps</p>
-        <p>TX: <span id="tx">--</span> kbps</p>
-    </div>
+    <h1>RPi Dashboard</h1>
 
-    <div class="card">
-        <h2>Funny thingys</h2>
-        <h4>Random Insult:</h4>
-        <p><span id="insult">--</span></p>
-        <h4>Random Quote:</h4>
-        <p><span id="quote">--</span></p>
-    </div>
+    <div class="container">
 
-    <div class="card">
-        <h2>Weather in <span id="city">--</span></h2>
-        <h4>Today (<span id="weather_current_date">--</span>)</h4>
-        <p>
-            Temperature: <span id="weather_temp">--</span> °C
-            (H: <span id="current_high">--</span>° L: <span id="current_low">--</span>°)
-        </p>
-        <p>Condition: <span id="weather_condition">--</span></p>
+        <div class="card admin-only admin-panel">
+          <h2>Admin Panel</h2>
+          <p>Quick Links to api's:</p>
+          <button class="button-60" onclick="window.location.href='/api/state';">state</button>
+          <button class="button-60" onclick="window.location.href='/api/system';">system</button>
+          <button class="button-60" onclick="window.location.href='/api/sensors';">sensors</button>
+          <button class="button-60" onclick="window.location.href='/api/fun';">fun</button>
+          <button class="button-60" onclick="window.location.href='/api/weather';">weather</button>
+          <button class="button-60" onclick="window.location.href='/api/network';">network</button>
+          <button class="button-60" onclick="window.location.href='/api/camera';">camera</button>
+          <button class="button-44" id="adminLogout" style="padding:0.6em 1.2em; font-size:14px; width:auto;">Logout</button>
+        </div>
 
-        <h4>Forecast - Next 2 Days</h4>
-        <p>
-            <strong><span id="forecast_day1_date">Day 1</span>:</strong>
-            <span id="forecast_day1_temp">--</span> °C
-            (H: <span id="forecast_day1_high">--</span>° L: <span id="forecast_day1_low">--</span>°)
-        </p>
-        <p>
-            <strong><span id="forecast_day2_date">Day 2</span>:</strong>
-            <span id="forecast_day2_temp">--</span> °C
-            (H: <span id="forecast_day2_high">--</span>° L: <span id="forecast_day2_low">--</span>°)
-        </p>
-    </div>
+        <div class="card">
+            <h2>System</h2>
+            <p>CPU Usage: <span id="cpu">--</span> %</p>
+            <p>RAM Usage: <span id="ram">--</span> %</p>
+            <p>RAM speed: <span id="ram_speed">--</span> mhz</p>
+            <p>temperature: <span id="core_temp">--</span> °C</p>
+        </div>
 
-    <div class="card">
-        <h2>External Sensors (in the pi's room)</h2>
-        <p>humidity: <span id="humidity">--</span> %</p>
-        <p>temperature: <span id="temp">--</span> °C</p>
-    </div>
+        <div class="card-center">
+            <button class="button-62" onclick="window.location.href='/site2';">
+                NEWEST FEATURE HERE
+            </button>
+        </div>
 
-    <div class="card">
-        <h2>backend status:</h2>
-        <h4>system: <span id="system-status-indicator">🔴</span></h4>
-        <h4>sensors: <span id="sensors-status-indicator">🔴</span></h4>
-        <h4>network: <span id="network-status-indicator">🔴</span></h4>
-        <h4>weather: <span id="weather-status-indicator">🔴</span></h4>
-        <h4>fun: <span id="fun-status-indicator">🔴</span></h4>
-        <h4>camera: <span id="camera-status-indicator">🔴</span></h4>
-        <p>last photo: <span id="camera-last">--</span></p>
+        <div class="card">
+            <h2>Network</h2>
+            <p>RX: <span id="rx">--</span> kbps</p>
+            <p>TX: <span id="tx">--</span> kbps</p>
+        </div>
+
+        <div class="card">
+            <h2>Funny thingys</h2>
+            <h4>Random Insult:</h4>
+            <p><span id="insult">--</span></p>
+            <h4>Random Quote:</h4>
+            <p><span id="quote">--</span></p>
+        </div>
+
+        <div class="card">
+            <h2>Weather in <span id="city">--</span></h2>
+            <h4>Today (<span id="weather_current_date">--</span>)</h4>
+            <p>
+                Temperature: <span id="weather_temp">--</span> °C
+                (H: <span id="current_high">--</span>° L: <span id="current_low">--</span>°)
+            </p>
+            <p>Condition: <span id="weather_condition">--</span></p>
+
+            <h4>Forecast - Next 2 Days</h4>
+            <p>
+                <strong><span id="forecast_day1_date">Day 1</span>:</strong>
+                <span id="forecast_day1_temp">--</span> °C
+                (H: <span id="forecast_day1_high">--</span>° L: <span id="forecast_day1_low">--</span>°)
+            </p>
+            <p>
+                <strong><span id="forecast_day2_date">Day 2</span>:</strong>
+                <span id="forecast_day2_temp">--</span> °C
+                (H: <span id="forecast_day2_high">--</span>° L: <span id="forecast_day2_low">--</span>°)
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>External Sensors (in the pi's room)</h2>
+            <p>humidity: <span id="humidity">--</span> %</p>
+            <p>temperature: <span id="temp">--</span> °C</p>
+        </div>
+
+        <div class="card">
+            <h2>backend status:</h2>
+            <h4>system: <span id="system-status-indicator">🔴</span></h4>
+            <h4>sensors: <span id="sensors-status-indicator">🔴</span></h4>
+            <h4>network: <span id="network-status-indicator">🔴</span></h4>
+            <h4>weather: <span id="weather-status-indicator">🔴</span></h4>
+            <h4>fun: <span id="fun-status-indicator">🔴</span></h4>
+            <h4>camera: <span id="camera-status-indicator">🔴</span></h4>
+            <p>last photo: <span id="camera-last">--</span></p>
+        </div>
+
+        <div class="card"></div>
+        <div class="card"></div>
+
+        <div class="card">
+            <h2>Comments</h2>
+
+            <input id="commentName"
+                   placeholder="name (optional)"
+                   maxlength="32"
+                   style="width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#111; color:#eee; margin-bottom:10px;box-sizing: border-box;">
+
+            <!-- Honeypot input: bots love filling every field, humans will never even see this -->
+            <input id="website" autocomplete="off" tabindex="-1" style="display:none" />
+
+            <textarea id="commentText"
+                      placeholder="write a comment..."
+                      maxlength="500"
+                      style="width:100%; min-height:90px; padding:10px; border-radius:8px; border:1px solid #333; background:#111; color:#eee; box-sizing: border-box;"></textarea>
+
+            <div style="display:flex; gap:10px; margin-top:10px; align-items:center;">
+                <button class="button-62" id="commentSubmit">Post</button>
+                <span id="commentStatus" style="opacity:0.85;"></span>
+            </div>
+
+            <hr style="border:1px solid #333; margin:15px 0;">
+            <div id="commentsList"></div>
+        </div>
+
     </div>
-</div>
 
 <script>
+/* JS below stays exactly as-is (only touching comments) */
 function setText(id, value) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -210,37 +414,40 @@ function getStatusColor(status) {
 
 async function update() {
     try {
+        // Grab the latest data from each endpoint
         const sensors = await fetch("/api/sensors").then(r => r.json());
         const system  = await fetch("/api/system").then(r => r.json());
         const network = await fetch("/api/network").then(r => r.json());
         const fun     = await fetch("/api/fun").then(r => r.json());
         const weather = await fetch("/api/weather").then(r => r.json());
 
+        // Decide what's "fresh" vs "stale" based on timestamps
         const systemStatus  = system.timestamp  ? getStatus(system.timestamp)   : "stale";
         const networkStatus = network.timestamp ? getStatus(network.timestamp)  : "stale";
         const sensorsStatus = sensors.timestamp ? getStatus(sensors.timestamp)  : "stale";
         const funStatus     = fun.timestamp     ? getStatus(fun.timestamp)      : "stale";
         const weatherStatus = weather.timestamp ? getStatus(weather.timestamp)  : "stale";
+
+        // Camera state is its own endpoint
         const camera = await fetch("/api/camera").then(r => r.json());
         const cameraStatus = camera.timestamp ? getStatus(camera.timestamp) : "stale";
-        
 
-        // System
+        // System box
         setText("cpu",       system.cpu ?? "--");
         setText("ram",       system.ram ?? "--");
         setText("ram_speed", system.ram_speed ?? "--");
         setText("core_temp", system.core_temp ?? "--");
 
-        // Network
+        // Network box
         setText("rx", network.rx_kbps ?? "--");
         setText("tx", network.tx_kbps ?? "--");
 
-        // Fun
+        // Fun box
         setText("quote",    fun.quote ?? "--");
         setText("insult",   fun.insult ?? "--");
         setText("coinflip", fun.coinflip ?? "--");
 
-        // Weather
+        // Weather box
         setText("city",                 weather.city ?? "--");
         setText("weather_temp",         (weather.outside_temp ?? "--"));
         setText("weather_condition",    weather.condition ?? "--");
@@ -259,30 +466,236 @@ async function update() {
         setText("forecast_day2_high", (weather.forecast_day2_high_temp ?? "--"));
         setText("forecast_day2_low",  (weather.forecast_day2_low_temp ?? "--"));
 
-        // Status indicators
+        // Status dots (green if recent updates are coming in)
         setText("system-status-indicator",  getStatusColor(systemStatus));
         setText("network-status-indicator", getStatusColor(networkStatus));
         setText("sensors-status-indicator", getStatusColor(sensorsStatus));
         setText("weather-status-indicator", getStatusColor(weatherStatus));
         setText("fun-status-indicator",     getStatusColor(funStatus));
 
-        // Sensors
+        // External sensor values
         setText("humidity", sensors.humidity ?? "--");
         setText("temp",     sensors.temp ?? "--");
 
-        // Camera
+        // Camera info + last capture time
         setText("camera-last", camera.last_capture ? new Date(camera.last_capture).toLocaleString() : "never");
         setText("camera-status-indicator", camera.ok ? "🟢" : "🔴");
         setText("camera-last", camera.last_capture ? camera.last_capture : "never");
-
-
-
-
     } catch (error) {
+        // If anything breaks, don't kill the page—just log it.
         console.error("Error fetching dashboard data:", error);
     }
 }
 
+async function loadComments() {
+  try {
+    const list = document.getElementById("commentsList");
+    if (!list) return;
+
+    // Pull the latest approved comments and redraw the list
+    const comments = await fetch("/api/comments").then(r => r.json());
+    list.innerHTML = "";
+
+    if (!Array.isArray(comments) || comments.length === 0) {
+      const empty = document.createElement("div");
+      empty.textContent = "No comments yet.";
+      empty.style.opacity = "0.8";
+      list.appendChild(empty);
+      return;
+    }
+
+    for (const c of comments) {
+      const wrap = document.createElement("div");
+      wrap.style.padding = "10px";
+      wrap.style.border = "1px solid #333";
+      wrap.style.borderRadius = "8px";
+      wrap.style.marginBottom = "10px";
+      wrap.style.background = "#151515";
+
+      const top = document.createElement("div");
+      top.style.display = "flex";
+      top.style.justifyContent = "space-between";
+      top.style.opacity = "0.85";
+      top.style.fontSize = "14px";
+
+      const name = document.createElement("span");
+      name.textContent = c.name || "anon";
+
+      const time = document.createElement("span");
+      time.textContent = c.created_at || "";
+
+      top.appendChild(name);
+      top.appendChild(time);
+
+      const text = document.createElement("div");
+      text.style.marginTop = "6px";
+      text.style.whiteSpace = "pre-wrap";
+      text.textContent = c.text || "";
+
+      wrap.appendChild(top);
+      wrap.appendChild(text);
+
+      // If you're admin, show a delete button under each comment
+      if (window.__isAdmin) {
+        const actions = document.createElement("div");
+        actions.style.marginTop = "10px";
+
+        const del = document.createElement("button");
+        del.className = "button-44";
+        del.textContent = "Delete";
+        del.style.padding = "0.5em 1em";
+        del.style.fontSize = "14px";
+        del.style.width = "auto";
+
+        del.addEventListener("click", async () => {
+          if (!confirm("Delete this comment?")) return;
+          const res = await fetch(`/api/comments/${c.id}`, { method: "DELETE" });
+          if (res.ok) loadComments();
+          else alert("Delete failed (not admin?)");
+        });
+
+        actions.appendChild(del);
+        wrap.appendChild(actions);
+      }
+
+      list.appendChild(wrap);
+    }
+  } catch (e) {
+    console.error("loadComments failed:", e);
+  }
+}
+
+async function postComment() {
+  const status = document.getElementById("commentStatus");
+  const nameEl = document.getElementById("commentName");
+  const textEl = document.getElementById("commentText");
+  if (!textEl) return;
+
+  // Build payload (website field is a hidden honeypot)
+  const payload = {
+    name: (nameEl?.value || "").trim(),
+    text: (textEl.value || "").trim(),
+    website: (document.getElementById("website")?.value || "")
+  };
+
+  if (!payload.text) {
+    if (status) status.textContent = "write something first.";
+    return;
+  }
+
+  if (status) status.textContent = "posting...";
+
+  try {
+    const res = await fetch("/api/comments", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    // Server returns helpful error strings, so show them
+    if (!res.ok) {
+      if (status) status.textContent = data.error || "failed.";
+      return;
+    }
+
+    // Clear input and reload the comment list
+    textEl.value = "";
+    if (status) status.textContent = "posted ✅";
+    await loadComments();
+  } catch (e) {
+    console.error(e);
+    if (status) status.textContent = "error.";
+  }
+}
+
+document.getElementById("commentSubmit")?.addEventListener("click", postComment);
+
+window.__isAdmin = false;
+
+function openAdminModal() {
+  // Show modal + backdrop and put cursor in the password box
+  document.getElementById("modalBackdrop").style.display = "block";
+  document.getElementById("adminModal").style.display = "block";
+  document.getElementById("adminPassword").value = "";
+  document.getElementById("adminMsg").textContent = "";
+  document.getElementById("adminPassword").focus();
+}
+
+function closeAdminModal() {
+  // Hide modal + backdrop
+  document.getElementById("modalBackdrop").style.display = "none";
+  document.getElementById("adminModal").style.display = "none";
+}
+
+async function refreshAdminState() {
+  try {
+    // Ask backend if our session is admin, then toggle UI bits
+    const me = await fetch("/api/admin/me").then(r => r.json());
+    window.__isAdmin = !!me.is_admin;
+    document.body.classList.toggle("admin-on", window.__isAdmin);
+
+    const btn = document.getElementById("adminBtn");
+    if (btn) btn.textContent = window.__isAdmin ? "Admin ✅" : "Admin";
+
+    loadComments();
+  } catch (e) {
+    console.error("refreshAdminState failed:", e);
+  }
+}
+
+async function adminLogin() {
+  const msg = document.getElementById("adminMsg");
+  const pw = document.getElementById("adminPassword").value;
+
+  msg.textContent = "logging in...";
+  const res = await fetch("/api/admin/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ password: pw })
+  });
+
+  if (!res.ok) {
+    msg.textContent = "wrong password.";
+    return;
+  }
+
+  closeAdminModal();
+  await refreshAdminState();
+}
+
+async function adminLogout() {
+  // Quick confirm so you don't fat-finger it
+  if (!confirm("Logout of admin session?")) return;
+  await fetch("/api/admin/logout", { method: "POST" });
+  await refreshAdminState();
+}
+
+document.getElementById("adminBtn")?.addEventListener("click", () => {
+  // Same button does two things: login when logged out, logout when logged in
+  if (window.__isAdmin) adminLogout();
+  else openAdminModal();
+});
+
+document.getElementById("adminCancel")?.addEventListener("click", closeAdminModal);
+document.getElementById("modalBackdrop")?.addEventListener("click", closeAdminModal);
+document.getElementById("adminLogin")?.addEventListener("click", adminLogin);
+document.getElementById("adminLogout")?.addEventListener("click", adminLogout);
+
+document.getElementById("adminPassword")?.addEventListener("keydown", (e) => {
+  // Enter key should submit the login, because of course it should
+  if (e.key === "Enter") adminLogin();
+});
+
+// On page load: figure out if we're already admin (session cookie)
+refreshAdminState();
+
+// Keep comments reasonably fresh without hammering the backend too hard
+setInterval(loadComments, 10000);
+loadComments();
+
+// Main dashboard refresh loop
 setInterval(update, 1000);
 update();
 </script>
