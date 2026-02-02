@@ -430,7 +430,6 @@ async function update() {
 
         // Camera state is its own endpoint
         const camera = await fetch("/api/camera").then(r => r.json());
-        const cameraStatus = camera.timestamp ? getStatus(camera.timestamp) : "stale";
 
         // System box
         setText("cpu",       system.cpu ?? "--");
@@ -480,7 +479,6 @@ async function update() {
         // Camera info + last capture time
         setText("camera-last", camera.last_capture ? new Date(camera.last_capture).toLocaleString() : "never");
         setText("camera-status-indicator", camera.ok ? "🟢" : "🔴");
-        setText("camera-last", camera.last_capture ? camera.last_capture : "never");
     } catch (error) {
         // If anything breaks, don't kill the page—just log it.
         console.error("Error fetching dashboard data:", error);

@@ -3,12 +3,17 @@ from flask_cors import CORS
 import os
 import random
 from datetime import datetime
-from picamera2 import Picamera2
 from flask import session
 import sqlite3
 import html
 from functools import wraps
+from requests import RequestException
+from json import JSONDecodeError
 
+
+
+import requests
+CAM_BASE = os.getenv("CAM_BASE", "http://127.0.0.1:5055")
 WEB_DIR = os.path.join(os.path.dirname(__file__), "../web")
 STATIC_DIR = os.path.join(WEB_DIR, "static")
 
@@ -237,56 +242,41 @@ def delete_comment(comment_id: int):
 # ---------------- CAMERA ----------------
 # Pi Camera integration: lazy-init the camera, capture files, and serve them back.
 
-PHOTO_DIR = "/home/blubb/ahripi-dev/data/pi-cam"
-os.makedirs(PHOTO_DIR, exist_ok=True)
-
-picam2 = None
-
-def get_camera():
-    # Start the camera on first use (so the server can still boot if the camera isn't ready).
-    global picam2
-    if picam2 is None:
-        cam = Picamera2()
-        cam.configure(cam.create_still_configuration())
-        cam.start()
-        picam2 = cam
-
-    STATE["camera"]["ok"] = True
-    STATE["camera"]["timestamp"] = datetime.now().isoformat()
-    return picam2
-
 @app.post("/api/camera/capture")
-def camera_capture():
-    # Take a photo right now and store it on disk.
-    cam = get_camera()
-
-    filename = datetime.now().strftime("photo_%Y-%m-%d_%H-%M-%S.jpg")
-    path = os.path.join(PHOTO_DIR, filename)
-
-    cam.capture_file(path)
-
-    # Update state so the UI knows what the latest photo is.
-    STATE["camera"]["latest"] = filename
-    STATE["camera"]["last_capture"] = datetime.now().isoformat()
-    STATE["camera"]["timestamp"] = datetime.now().isoformat()
-
-    return jsonify({"status": "ok", "filename": filename, "url": f"/photos/{filename}"})
+def camera_capture_proxy():
+    try:
+        r = requests.post(f"{CAM_BASE}/capture", timeout=60)
+        return (r.text, r.status_code, {"Content-Type": r.headers.get("Content-Type", "application/json")})
+    except RequestException as e:
+        return jsonify({"status": "error", "error": f"camera collector unreachable: {e}"}), 502
 
 @app.get("/api/camera")
-def get_camera_state():
-    # Ping the camera and report whether it's usable.
+def camera_state_proxy():
     try:
-        get_camera()
-    except Exception as e:
+        r = requests.get(f"{CAM_BASE}/health", timeout=5)
+        r.raise_for_status()
+        data = r.json()
+
+        STATE["camera"].update({
+            "ok": data.get("ok", False),
+            "latest": data.get("latest"),
+            "last_capture": data.get("last_capture"),
+            "timestamp": data.get("timestamp"),
+        })
+        return jsonify(data)
+
+    except (RequestException, ValueError) as e:
+        # ValueError covers JSON decode errors too
         STATE["camera"]["ok"] = False
-        STATE["camera"]["timestamp"] = datetime.now().isoformat()
-        STATE["camera"]["error"] = str(e)
-    return jsonify(STATE["camera"])
+        return jsonify({"ok": False, "error": f"camera collector error: {e}"}), 502
 
 @app.get("/photos/<path:filename>")
-def serve_photo(filename):
-    # Serve captured photos directly from the photo folder.
-    return send_from_directory(PHOTO_DIR, filename)
+def photos_proxy(filename):
+    try:
+        r = requests.get(f"{CAM_BASE}/photos/{filename}", timeout=60)
+        return (r.content, r.status_code, {"Content-Type": r.headers.get("Content-Type", "application/octet-stream")})
+    except RequestException as e:
+        return jsonify({"status": "error", "error": f"camera collector unreachable: {e}"}), 502
 
 
 # ---------------- SENSORS ----------------
