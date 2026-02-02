@@ -4,27 +4,30 @@ import random
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from pathlib import Path
 
 import requests
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 
 BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
 URL = f"{BASE_URL}/api/fun"
 INTERVAL = 20
-MAX_BACKOFF = 60 
+MAX_BACKOFF = 60
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+DATA_DIR = PROJECT_ROOT / "data" / "fun-data"
 
-DATA_DIR = "/home/blubb/rpi-dashboard/data"
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
-
+logging.info("SCRIPT=%s", Path(__file__).resolve())
+logging.info("CWD=%s", Path.cwd())
+logging.info("DATA_DIR=%s (exists=%s)", DATA_DIR, DATA_DIR.exists())
+logging.info("QUOTES=%s (exists=%s)", DATA_DIR / "quotes.txt", (DATA_DIR / "quotes.txt").exists())
+logging.info("INSULTS=%s (exists=%s)", DATA_DIR / "insults.txt", (DATA_DIR / "insults.txt").exists())
 
 def read_lines(filename: str) -> list[str]:
-    """Read non-empty, stripped lines from a file.
-
-    Returns a list with at least one item.
-    """
-    path = f"{DATA_DIR}/{filename}"
+    path = DATA_DIR / filename
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with path.open("r", encoding="utf-8") as f:
             lines = [line.strip() for line in f if line.strip()]
         if not lines:
             logging.warning("%s is empty", path)
@@ -36,7 +39,6 @@ def read_lines(filename: str) -> list[str]:
     except Exception as e:
         logging.exception("Failed reading %s: %s", path, e)
         return ["(read error)"]
-
 
 def post_payload(session: requests.Session, payload: dict) -> None:
     """POST payload using the given requests.Session. Raises on failure."""

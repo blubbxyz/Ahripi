@@ -3,6 +3,10 @@ from flask_cors import CORS
 import os
 import random
 from datetime import datetime
+from picamera2 import Picamera2
+
+
+
 
 WEB_DIR = os.path.join(os.path.dirname(__file__), "../web")
 STATIC_DIR = os.path.join(WEB_DIR, "static")
@@ -28,13 +32,68 @@ STATE = {
         "forecast_day2_avg_temp": None,
         "forecast_day2_high_temp": None,
         "forecast_day2_low_temp": None,
-        "timestamp": None
+        "timestamp": None   
     },
-    "fun": {"quote": None, "timestamp": None}
+    "fun": {"quote": None, "timestamp": None},
+    "camera": {"ok": False, "latest": None, "last_capture": None, "timestamp": None}
+
+
 }
 
 
 # ----- API ENDPOINTS -----
+
+# cam
+PHOTO_DIR = "/home/blubb/ahripi-dev/data/pi-cam"
+os.makedirs(PHOTO_DIR, exist_ok=True)
+
+picam2 = None
+
+def get_camera():
+    global picam2
+    if picam2 is None:
+        cam = Picamera2()
+        cam.configure(cam.create_still_configuration())
+        cam.start()
+        picam2 = cam
+
+    STATE["camera"]["ok"] = True
+    STATE["camera"]["timestamp"] = datetime.now().isoformat()
+    return picam2
+
+
+
+@app.post("/api/camera/capture")
+def camera_capture():
+    cam = get_camera()
+
+    filename = datetime.now().strftime("photo_%Y-%m-%d_%H-%M-%S.jpg")
+    path = os.path.join(PHOTO_DIR, filename)
+
+    cam.capture_file(path)
+
+    STATE["camera"]["latest"] = filename
+    STATE["camera"]["last_capture"] = datetime.now().isoformat()
+    STATE["camera"]["timestamp"] = datetime.now().isoformat()
+
+
+    return jsonify({"status": "ok", "filename": filename, "url": f"/photos/{filename}"})
+
+@app.get("/api/camera")
+def get_camera_state():
+    try:
+        get_camera()
+    except Exception as e:
+        STATE["camera"]["ok"] = False
+        STATE["camera"]["timestamp"] = datetime.now().isoformat()
+        STATE["camera"]["error"] = str(e)
+    return jsonify(STATE["camera"])
+
+
+@app.get("/photos/<path:filename>")
+def serve_photo(filename):
+    return send_from_directory(PHOTO_DIR, filename)
+
 
 # Sensors
 @app.post("/api/sensors")

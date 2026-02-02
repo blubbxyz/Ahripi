@@ -1,43 +1,94 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
-    <meta charset="UTF-8" />
-    <body>
-    <h2>there is nothing here yet :c...</h2>
-        <title>HEY</title>
-    <style>
-        html, body {
-        margin: 0;
-        width: 100%;
-        height: 100%;
-        background: #0f0f0f;
-        color: white;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
+  <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
+  <meta charset="UTF-8" />
+  <title>RPi Camera</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: #0f0f0f;
+      color: white;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
 
-        body {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 20px;
+    }
 
-        h1 {
-        font-size: 20vw; /* BIG */
-        font-weight: 900;
-        letter-spacing: 0.05em;
-        user-select: none;
-        }
-        h2 
-        {
-            font-family: sans-serif;
-            background: #111;
-            color: #eee;
-            padding: 20px;
-        }
-    </style>
-    </head>
-    <body>
-    <h1>HEY</h1>
+    h1 {
+      font-size: 5vw;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      user-select: none;
+      margin: 0;
+      line-height: 1;
+    }
+
+    .card {
+      background: #222;
+      padding: 15px;
+      border-radius: 10px;
+      width: min(500px, 92vw);
+    }
+
+    .button-62 {
+      font-size: 18px;
+      padding: 1em 2em;
+      border: none;
+      outline: none;
+      color: #fff;
+      background: #111;
+      cursor: pointer;
+      border-radius: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>take a foto in my room :D</h1>
+  <p>Click the button to take a photo with the Raspberry Pi camera(you should see what is happening on my monitor at the moment).</p>
+
+  <div class="card">
+    <h2>Camera</h2>
+    <button class="button-62" id="takePhotoBtn">Take Photo</button>
+    <p id="photoStatus">--</p>
+    <img id="latestPhoto"
+         style="width:100%; max-width:500px; border-radius:8px; margin-top:10px; display:none;" />
+    <button class="button-62" onclick="window.location.href='/';">
+            Go back to the main page</button>
+  </div>
+
+  <script>
+    async function takePhoto() {
+      const status = document.getElementById("photoStatus");
+      const img = document.getElementById("latestPhoto");
+
+      status.textContent = "Capturing...";
+
+      try {
+        const res = await fetch("/api/camera/capture", { method: "POST" });
+        const data = await res.json();
+
+        if (data.status !== "ok") throw new Error("capture failed");
+
+        status.textContent = "Saved: " + data.filename;
+        img.src = data.url + "?t=" + Date.now();
+        img.style.display = "block";
+      } catch (e) {
+        status.textContent = "Error: " + e;
+      }
+    }
+
+    const takeBtn = document.getElementById("takePhotoBtn");
+    if (takeBtn) takeBtn.addEventListener("click", takePhoto);
+  </script>
 </body>
 </html>

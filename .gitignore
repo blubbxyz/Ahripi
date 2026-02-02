@@ -12,3 +12,5 @@ help.txt
 *.env
 *.service
 .env.*
+data/pi-cam/
+Camera.py

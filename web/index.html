@@ -16,8 +16,8 @@
             flex-wrap: wrap;
             gap: 15px;
             max-width: 1200px;
-            margin: 0 auto;              /* centers the whole grid */
-            justify-content: center;     /* centers cards inside */
+            margin: 0 auto;
+            justify-content: center;
         }
         .card-center {
             display: flex;
@@ -131,9 +131,8 @@
     </div>
 
     <div class="card-center">
-        <button class="button-62" onclick="window.location.href='https://www.pinode.dev/site2';">
-            Go to another website
-        </button>
+        <button class="button-62" onclick="window.location.href='/site2';">
+            NEWEST FEATURE HERE        </button>
     </div>
 
     <div class="card">
@@ -185,13 +184,15 @@
         <h4>network: <span id="network-status-indicator">🔴</span></h4>
         <h4>weather: <span id="weather-status-indicator">🔴</span></h4>
         <h4>fun: <span id="fun-status-indicator">🔴</span></h4>
+        <h4>camera: <span id="camera-status-indicator">🔴</span></h4>
+        <p>last photo: <span id="camera-last">--</span></p>
     </div>
 </div>
 
 <script>
 function setText(id, value) {
     const el = document.getElementById(id);
-    if (!el) return;            // IMPORTANT: prevents dashboard from crashing
+    if (!el) return;
     el.textContent = value;
 }
 
@@ -220,6 +221,9 @@ async function update() {
         const sensorsStatus = sensors.timestamp ? getStatus(sensors.timestamp)  : "stale";
         const funStatus     = fun.timestamp     ? getStatus(fun.timestamp)      : "stale";
         const weatherStatus = weather.timestamp ? getStatus(weather.timestamp)  : "stale";
+        const camera = await fetch("/api/camera").then(r => r.json());
+        const cameraStatus = camera.timestamp ? getStatus(camera.timestamp) : "stale";
+        
 
         // System
         setText("cpu",       system.cpu ?? "--");
@@ -234,7 +238,7 @@ async function update() {
         // Fun
         setText("quote",    fun.quote ?? "--");
         setText("insult",   fun.insult ?? "--");
-        setText("coinflip", fun.coinflip ?? "--"); // safe even if element removed
+        setText("coinflip", fun.coinflip ?? "--");
 
         // Weather
         setText("city",                 weather.city ?? "--");
@@ -265,6 +269,14 @@ async function update() {
         // Sensors
         setText("humidity", sensors.humidity ?? "--");
         setText("temp",     sensors.temp ?? "--");
+
+        // Camera
+        setText("camera-last", camera.last_capture ? new Date(camera.last_capture).toLocaleString() : "never");
+        setText("camera-status-indicator", camera.ok ? "🟢" : "🔴");
+        setText("camera-last", camera.last_capture ? camera.last_capture : "never");
+
+
+
 
     } catch (error) {
         console.error("Error fetching dashboard data:", error);
