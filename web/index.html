@@ -405,7 +405,7 @@ function getStatus(timestamp) {
     const lastUpdate = new Date(timestamp);
     const now = new Date();
     const diffSeconds = (now - lastUpdate) / 1000;
-    return diffSeconds < 15 ? "fresh" : "stale";
+    return diffSeconds < 30 ? "fresh" : "stale";
 }
 
 function getStatusColor(status) {
