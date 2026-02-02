@@ -30,6 +30,14 @@ def read_dht(dht):
     else:
         logging.debug("DHT read returned invalid values")
         return None, None
+    
+def read_dht_with_retries(dht, tries=3, delay=0.5):
+    for _ in range(tries):
+        t, h = read_dht(dht)
+        if t is not None and h is not None:
+            return t, h
+        time.sleep(delay)
+    return None, None
 
 def post_payload(session, payload):
     """POST payload using the given requests.Session. Raises on failure."""
@@ -44,7 +52,11 @@ def main():
 
     try:
         while True:
-            temp, humidity = read_dht(dht)
+            temp, humidity = read_dht_with_retries(dht)
+            if temp is None or humidity is None:
+                logging.warning("Skipping send: DHT read failed")
+                time.sleep(INTERVAL)
+                continue
             payload = {
                 "temp": temp,
                 "humidity": humidity,
