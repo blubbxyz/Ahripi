@@ -14,3 +14,10 @@ help.txt
 .env.*
 data/pi-cam/
 Camera.py
+*.db
+data/*.db
+data/pi-cam/*.jpg
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
