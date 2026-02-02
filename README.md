@@ -1,5 +1,3 @@
-Perfect — here is the **compiled README as plain `.txt` content**.
-You can save this directly as `README.txt`.
 
 ---
 
@@ -203,12 +201,3 @@ Personal / private project.
 No warranty provided.
 
 ---
-
-If you want next:
-
-* README.md version
-* .env.example file
-* systemd service templates
-* repo cleanup checklist
-
-Just say the word.
