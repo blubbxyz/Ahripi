@@ -349,6 +349,7 @@
             <h2>External Sensors (in the pi's room)</h2>
             <p>humidity: <span id="humidity">--</span> %</p>
             <p>temperature: <span id="temp">--</span> °C</p>
+            <p>air pressure: <span id="pressure">--</span> Pa</p>
         </div>
 
         <div class="card">
@@ -475,6 +476,7 @@ async function update() {
         // External sensor values
         setText("humidity", sensors.humidity ?? "--");
         setText("temp",     sensors.temp ?? "--");
+        setText("pressure", sensors.pressure ?? "--");
 
         // Camera info + last capture time
         setText("camera-last", camera.last_capture ? new Date(camera.last_capture).toLocaleString() : "never");
