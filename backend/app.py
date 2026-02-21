@@ -54,6 +54,52 @@ STATE = {
     "camera": {"ok": False, "latest": None, "last_capture": None, "timestamp": None}
 }
 
+# ---------------- HISTORY MAP ----------------
+# Maps sensor names to (table, column) for each tier of data resolution.
+# Used by /api/history to query the right table depending on the time range.
+HISTORY_MAP = {
+    "temp": {
+        "raw":      ("sensor_readings",          "temp"),
+        "minutely": ("sensor_readings_minutely",  "avg_temp"),
+        "hourly":   ("sensor_readings_hourly",    "avg_temp"),
+    },
+    "humidity": {
+        "raw":      ("sensor_readings",          "humidity"),
+        "minutely": ("sensor_readings_minutely",  "avg_humidity"),
+        "hourly":   ("sensor_readings_hourly",    "avg_humidity"),
+    },
+    "cpu": {
+        "raw":      ("system_readings",          "cpu"),
+        "minutely": ("system_readings_minutely",  "avg_cpu"),
+        "hourly":   ("system_readings_hourly",    "avg_cpu"),
+    },
+    "ram": {
+        "raw":      ("system_readings",          "ram"),
+        "minutely": ("system_readings_minutely",  "avg_ram"),
+        "hourly":   ("system_readings_hourly",    "avg_ram"),
+    },
+    "ram_speed": {
+        "raw":      ("system_readings",          "ram_speed"),
+        "minutely": ("system_readings_minutely",  "avg_ram_speed"),
+        "hourly":   ("system_readings_hourly",    "avg_ram_speed"),
+    },
+    "core_temp": {
+        "raw":      ("system_readings",          "core_temp"),
+        "minutely": ("system_readings_minutely",  "avg_core_temp"),
+        "hourly":   ("system_readings_hourly",    "avg_core_temp"),
+    },
+    "rx_kbps": {
+        "raw":      ("network_readings",          "rx_kbps"),
+        "minutely": ("network_readings_minutely",  "avg_rx_kbps"),
+        "hourly":   ("network_readings_hourly",    "avg_rx_kbps"),
+    },
+    "tx_kbps": {
+        "raw":      ("network_readings",          "tx_kbps"),
+        "minutely": ("network_readings_minutely",  "avg_tx_kbps"),
+        "hourly":   ("network_readings_hourly",    "avg_tx_kbps"),
+    },
+}
+
 # ---------------- ADMIN AUTH ----------------
 # Tiny session-based admin login: good enough to protect the "dangerous" endpoints.
 
@@ -81,41 +127,200 @@ def admin_logout():
     session.clear()
     return jsonify({"status": "ok"})
 
-# ---------------- COMMENTS ----------------
-# Simple comment system backed by SQLite (plus a little spam + rate-limit glue).
+# ---------------- DATABASE ----------------
 
-COMMENTS_DB = os.path.join(os.path.dirname(__file__), "../data/comments.db")
+DATABASE = os.path.join(os.path.dirname(__file__), "../data/database.db")
 
 def db():
-    # Open a SQLite connection with dict-like rows (so we can do row["col"]).
-    conn = sqlite3.connect(COMMENTS_DB)
+    conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
-def init_comments_db():
-    # Make sure the folder + tables exist before we start handling requests.
-    os.makedirs(os.path.dirname(COMMENTS_DB), exist_ok=True)
+def init_db():
+    os.makedirs(os.path.dirname(DATABASE), exist_ok=True)
     with db() as conn:
+
+        # ---- Comments + rate limits ----
+
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            text TEXT NOT NULL,
-            ip TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            approved INTEGER DEFAULT 1
-        )
+            CREATE TABLE IF NOT EXISTS comments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                text TEXT NOT NULL,
+                ip TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                approved INTEGER DEFAULT 1
+            )
         """)
         conn.execute("""
-        CREATE TABLE IF NOT EXISTS rate_limits (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ip TEXT NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
+            CREATE TABLE IF NOT EXISTS rate_limits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
         """)
 
+        # ---- Raw readings (per-second) ----
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sensor_readings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                temp REAL,
+                humidity REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sensor_recorded
+                ON sensor_readings(recorded_at)
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS system_readings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cpu REAL,
+                ram REAL,
+                ram_speed REAL,
+                core_temp REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_system_recorded
+                ON system_readings(recorded_at)
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS network_readings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rx_kbps REAL,
+                tx_kbps REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_network_recorded
+                ON network_readings(recorded_at)
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS weather_readings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                weather_date TEXT,
+                outside_temp REAL,
+                condition TEXT,
+                current_high_temp REAL,
+                current_low_temp REAL,
+                forecast_day1_date TEXT,
+                forecast_day1_avg_temp REAL,
+                forecast_day1_high_temp REAL,
+                forecast_day1_low_temp REAL,
+                forecast_day2_date TEXT,
+                forecast_day2_avg_temp REAL,
+                forecast_day2_high_temp REAL,
+                forecast_day2_low_temp REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_weather_recorded
+                ON weather_readings(recorded_at)
+        """)
+
+        # ---- Minutely aggregates (kept 30 days -> 1 year) ----
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sensor_readings_minutely (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                minute TEXT NOT NULL,
+                avg_temp REAL, min_temp REAL, max_temp REAL,
+                avg_humidity REAL, min_humidity REAL, max_humidity REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS system_readings_minutely (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                minute TEXT NOT NULL,
+                avg_cpu REAL, min_cpu REAL, max_cpu REAL,
+                avg_ram REAL, min_ram REAL, max_ram REAL,
+                avg_ram_speed REAL, min_ram_speed REAL, max_ram_speed REAL,
+                avg_core_temp REAL, min_core_temp REAL, max_core_temp REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS network_readings_minutely (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                minute TEXT NOT NULL,
+                avg_rx_kbps REAL, min_rx_kbps REAL, max_rx_kbps REAL,
+                avg_tx_kbps REAL, min_tx_kbps REAL, max_tx_kbps REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # ---- Hourly aggregates (kept beyond 1 year) ----
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sensor_readings_hourly (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hour TEXT NOT NULL,
+                avg_temp REAL, min_temp REAL, max_temp REAL,
+                avg_humidity REAL, min_humidity REAL, max_humidity REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS system_readings_hourly (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hour TEXT NOT NULL,
+                avg_cpu REAL, min_cpu REAL, max_cpu REAL,
+                avg_ram REAL, min_ram REAL, max_ram REAL,
+                avg_ram_speed REAL, min_ram_speed REAL, max_ram_speed REAL,
+                avg_core_temp REAL, min_core_temp REAL, max_core_temp REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS network_readings_hourly (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hour TEXT NOT NULL,
+                avg_rx_kbps REAL, min_rx_kbps REAL, max_rx_kbps REAL,
+                avg_tx_kbps REAL, min_tx_kbps REAL, max_tx_kbps REAL,
+                recorded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+# ---------------- HELPER FUNCTIONS ----------------
+
+def parse_range(range_str):
+    """Convert '7d', '24h', '30m' into a SQLite datetime modifier like '-7 days'."""
+    unit_map = {"m": "minutes", "h": "hours", "d": "days"}
+    amount = range_str[:-1]
+    unit = range_str[-1]
+    if unit not in unit_map or not amount.isdigit():
+        return None
+    return f"-{amount} {unit_map[unit]}"
+
+def get_tier(range_str):
+    """Figure out which data tier to query based on the requested range."""
+    amount = int(range_str[:-1])
+    unit = range_str[-1]
+    if unit == "m":
+        days = amount / 1440
+    elif unit == "h":
+        days = amount / 24
+    else:
+        days = amount
+
+    if days <= 30:
+        return "raw"
+    elif days <= 365:
+        return "minutely"
+    else:
+        return "hourly"
+
 def require_admin_session(fn):
-    # Decorator: block endpoint unless you're logged in as admin.
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if not is_admin():
@@ -124,8 +329,6 @@ def require_admin_session(fn):
     return wrapper
 
 def check_rate_limit(ip: str, max_per_10min: int = 3) -> bool:
-    # Basic anti-spam: allow only N comments per 10 minutes per IP.
-    # Returns True if allowed, False if blocked.
     with db() as conn:
         cur = conn.execute("""
             SELECT COUNT(*) AS c
@@ -136,29 +339,18 @@ def check_rate_limit(ip: str, max_per_10min: int = 3) -> bool:
         count = cur.fetchone()["c"]
         if count >= max_per_10min:
             return False
-
         conn.execute("INSERT INTO rate_limits (ip) VALUES (?)", (ip,))
         return True
 
 def looks_like_spam(text: str) -> bool:
-    # Super cheap "does this look like a bot" filter.
-    # Not perfect, just trying to block obvious garbage.
     t = text.lower().strip()
-
-    # more than 1 link is usually sus
     if t.count("http://") + t.count("https://") > 1:
         return True
-
-    # one link and basically no real message
     if (("http://" in t) or ("https://" in t)) and len(t) < 25:
         return True
-
-    # common spam keywords
     banned = ["free money", "crypto", "forex", "porn", "viagra", "casino", "betting"]
     if any(b in t for b in banned):
         return True
-
-    # lots of the same character in a row -> classic bot spam pattern
     if len(text) >= 50:
         max_run = 1
         run = 1
@@ -170,40 +362,34 @@ def looks_like_spam(text: str) -> bool:
                 run = 1
         if max_run >= 12:
             return True
-
     return False
 
-init_comments_db()
+init_db()
+
+# ---------------- COMMENTS ----------------
 
 @app.post("/api/comments")
 def post_comment():
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
     name = (data.get("name") or "anon").strip()
-    website = (data.get("website") or "").strip()  # honeypot field: real users won't fill this
+    website = (data.get("website") or "").strip()
 
-    # If this field is filled, it's almost certainly a bot auto-filling forms.
     if website:
         return jsonify({"error": "blocked"}), 400
-
     if len(text) < 1:
         return jsonify({"error": "empty comment"}), 400
     if len(text) > 500:
         return jsonify({"error": "comment too long (max 500)"}), 400
     if len(name) > 32:
         name = name[:32]
-
-    # Quick spam check before we even touch the DB.
     if looks_like_spam(text):
         return jsonify({"error": "blocked"}), 400
 
-    # Best-effort IP (X-Forwarded-For if behind proxy, otherwise remote_addr).
     ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "unknown").split(",")[0].strip()
-
     if not check_rate_limit(ip):
         return jsonify({"error": "rate limited"}), 429
 
-    # Escape user input so it can't inject HTML into the page.
     safe_text = html.escape(text)
     safe_name = html.escape(name)
 
@@ -218,7 +404,6 @@ def post_comment():
 
 @app.get("/api/comments")
 def get_comments():
-    # Return the newest approved comments (kept small to avoid mega payloads).
     with db() as conn:
         rows = conn.execute("""
             SELECT id, name, text, created_at
@@ -232,15 +417,12 @@ def get_comments():
 @app.delete("/api/comments/<int:comment_id>")
 @require_admin_session
 def delete_comment(comment_id: int):
-    # Admin-only: nuke a comment by id.
     with db() as conn:
         conn.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
     return jsonify({"status": "ok"})
 
 
-
 # ---------------- CAMERA ----------------
-# Pi Camera integration: lazy-init the camera, capture files, and serve them back.
 
 @app.post("/api/camera/capture")
 def camera_capture_proxy():
@@ -256,7 +438,6 @@ def camera_state_proxy():
         r = requests.get(f"{CAM_BASE}/health", timeout=5)
         r.raise_for_status()
         data = r.json()
-
         STATE["camera"].update({
             "ok": data.get("ok", False),
             "latest": data.get("latest"),
@@ -264,9 +445,7 @@ def camera_state_proxy():
             "timestamp": data.get("timestamp"),
         })
         return jsonify(data)
-
     except (RequestException, ValueError) as e:
-        # ValueError covers JSON decode errors too
         STATE["camera"]["ok"] = False
         return jsonify({"ok": False, "error": f"camera collector error: {e}"}), 502
 
@@ -280,13 +459,18 @@ def photos_proxy(filename):
 
 
 # ---------------- SENSORS ----------------
-# Endpoints used by the sensor collector to push updates + frontend to read them.
 
 @app.post("/api/sensors")
 def update_sensors():
     data = request.get_json(silent=True) or {}
     data["timestamp"] = datetime.now().isoformat()
     STATE["sensors"].update(data)
+
+    with db() as conn:
+        conn.execute(
+            "INSERT INTO sensor_readings (temp, humidity) VALUES (?, ?)",
+            (data.get("temp"), data.get("humidity"))
+        )
     return {"status": "ok"}
 
 @app.get("/api/sensors")
@@ -295,13 +479,23 @@ def get_sensors():
 
 
 # ---------------- SYSTEM ----------------
-# CPU/RAM/temp stats get pushed here by a collector.
 
 @app.post("/api/system")
 def update_system():
     data = request.get_json(silent=True) or {}
     data["timestamp"] = datetime.now().isoformat()
     STATE["system"].update(data)
+
+    with db() as conn:
+        conn.execute("""
+            INSERT INTO system_readings (cpu, ram, ram_speed, core_temp)
+            VALUES (?, ?, ?, ?)
+        """, (
+            data.get("cpu"),
+            data.get("ram"),
+            data.get("ram_speed"),
+            data.get("core_temp")
+        ))
     return {"status": "ok"}
 
 @app.get("/api/system")
@@ -310,13 +504,21 @@ def get_system():
 
 
 # ---------------- NETWORK ----------------
-# Network RX/TX stats get pushed here by a collector.
 
 @app.post("/api/network")
 def update_network():
     data = request.get_json(silent=True) or {}
     data["timestamp"] = datetime.now().isoformat()
     STATE["network"].update(data)
+
+    with db() as conn:
+        conn.execute("""
+            INSERT INTO network_readings (rx_kbps, tx_kbps)
+            VALUES (?, ?)
+        """, (
+            data.get("rx_kbps"),
+            data.get("tx_kbps")
+        ))
     return {"status": "ok"}
 
 @app.get("/api/network")
@@ -325,13 +527,35 @@ def get_network():
 
 
 # ---------------- WEATHER ----------------
-# Weather data (probably from an API / script) gets posted in, UI reads it out.
 
 @app.post("/api/weather")
 def update_weather():
     data = request.get_json(silent=True) or {}
     data["timestamp"] = datetime.now().isoformat()
     STATE["weather"].update(data)
+
+    with db() as conn:
+        conn.execute("""
+            INSERT INTO weather_readings (
+                weather_date, outside_temp, condition, current_high_temp, current_low_temp,
+                forecast_day1_date, forecast_day1_avg_temp, forecast_day1_high_temp, forecast_day1_low_temp,
+                forecast_day2_date, forecast_day2_avg_temp, forecast_day2_high_temp, forecast_day2_low_temp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            data.get("weather_date"),
+            data.get("outside_temp"),
+            data.get("condition"),
+            data.get("current_high_temp"),
+            data.get("current_low_temp"),
+            data.get("forecast_day1_date"),
+            data.get("forecast_day1_avg_temp"),
+            data.get("forecast_day1_high_temp"),
+            data.get("forecast_day1_low_temp"),
+            data.get("forecast_day2_date"),
+            data.get("forecast_day2_avg_temp"),
+            data.get("forecast_day2_high_temp"),
+            data.get("forecast_day2_low_temp")
+        ))
     return {"status": "ok"}
 
 @app.get("/api/weather")
@@ -340,7 +564,6 @@ def get_weather():
 
 
 # ---------------- FUN ----------------
-# Random "fun" stuff (quotes/insults/coinflip) pushed by a collector.
 
 @app.post("/api/fun")
 def update_fun():
@@ -355,15 +578,42 @@ def get_fun():
 
 
 # ---------------- FULL STATE ----------------
-# One endpoint to rule them all: frontend can fetch everything in one request.
 
 @app.get("/api/state")
 def get_state():
     return jsonify(STATE)
 
 
+# ---------------- HISTORY ----------------
+
+@app.get("/api/history")
+def get_history():
+    sensor = request.args.get("sensor", "")
+    range_str = request.args.get("range", "24h")
+
+    if sensor not in HISTORY_MAP:
+        return jsonify({"error": f"unknown sensor: {sensor}"}), 400
+
+    modifier = parse_range(range_str)
+    if not modifier:
+        return jsonify({"error": "bad range (use e.g. 30m, 24h, 7d)"}), 400
+
+    tier = get_tier(range_str)
+    table, column = HISTORY_MAP[sensor][tier]
+    time_col = "recorded_at" if tier == "raw" else ("minute" if tier == "minutely" else "hour")
+
+    with db() as conn:
+        rows = conn.execute(f"""
+            SELECT {column} AS value, {time_col} AS time
+            FROM {table}
+            WHERE {time_col} >= datetime('now', ?)
+            ORDER BY {time_col} ASC
+        """, (modifier,)).fetchall()
+
+    return jsonify([{"value": r["value"], "time": r["time"]} for r in rows])
+
+
 # ---------------- SERVE WEBSITE ----------------
-# Serve the dashboard UI (and any static assets) straight from the web folder.
 
 @app.get("/")
 def index():
@@ -383,7 +633,6 @@ WEB2_STATIC = os.path.join(WEB2_DIR, "static")
 
 @app.get("/site2/")
 def site2_index():
-    # Second site/skin version (served under /site2/).
     return send_from_directory(WEB2_DIR, "index.html")
 
 @app.get("/site2/static/<path:path>")
@@ -396,7 +645,6 @@ def site2_files(path):
 
 
 # ---------------- BUTTON ACTION ----------------
-# Placeholder endpoint: frontend can ping this when the coinflip button is pressed.
 
 @app.post("/api/button/coinflip")
 def button_action():
@@ -406,7 +654,6 @@ def button_action():
 
 
 # ---------------- RUN SERVER ----------------
-# Local dev entrypoint (in production you'd usually run via gunicorn/systemd).
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
