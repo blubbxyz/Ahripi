@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
     <title>RPi Dashboard</title>
     <link rel="stylesheet" href="style.css">
@@ -40,12 +42,26 @@
           <button class="button-44" id="adminLogout" style="padding:0.6em 1.2em; font-size:14px; width:auto;">Logout</button>
         </div>
 
-        <div class="card">
-            <h2>System</h2>
-            <p>CPU Usage: <span id="cpu">--</span> %</p>
-            <p>RAM Usage: <span id="ram">--</span> %</p>
-            <p>RAM speed: <span id="ram_speed">--</span> mhz</p>
-            <p>temperature: <span id="core_temp">--</span> °C</p>
+        <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+                <h2 class="card-title">System</h2>
+                <div class="flex justify-between">
+                    <span class="text-base-content/60">CPU Usage</span>
+                    <span id="cpu">--</span> %
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-base-content/60">RAM Usage</span>
+                    <span id="ram">--</span> %
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-base-content/60">RAM Speed</span>
+                    <span id="ram_speed">--</span> MHz
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-base-content/60">Temperature</span>
+                    <span id="core_temp">--</span> °C
+                </div>
+            </div>
         </div>
 
         <div class="card-center">
