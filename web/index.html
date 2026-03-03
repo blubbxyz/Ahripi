@@ -1,466 +1,282 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-<head>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
+  <head>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
-    <title>RPi Dashboard</title>
     <link rel="stylesheet" href="style.css">
-</head>
+    <script src="script.js" defer></script>
+    <style>
+      /* Hide admin-only items by default, show when logged in */
+      .admin-only { display: none; }
+      .admin-on .admin-only { display: block; }
+    </style>
+  </head>
 
-<body>
-    <div class="topbar">
-        <button class="button-62" id="adminBtn" style="padding:0.6em 1.2em; font-size:14px;">Admin</button>
-    </div>
+  <body>
+    <div class="drawer drawer-end">
+      <input id="my-drawer-5" type="checkbox" class="drawer-toggle" />
 
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal" id="adminModal">
-        <h3 style="margin:0 0 10px 0;">Admin Login</h3>
-        <input id="adminPassword" type="password" placeholder="password" />
-        <div id="adminMsg" style="margin-top:8px; opacity:0.85;"></div>
-        <div class="modal-actions">
-            <button class="button-62" id="adminCancel" style="padding:0.6em 1.2em; font-size:14px;">Cancel</button>
-            <button class="button-62" id="adminLogin" style="padding:0.6em 1.2em; font-size:14px;">Login</button>
+      <!-- ===== MAIN CONTENT ===== -->
+      <div class="drawer-content">
+
+        <!-- Navbar -->
+        <div class="navbar">
+          <div class="flex-1">
+            <label for="my-drawer-5" class="drawer-button btn btn-primary">⚙️</label>
+          </div>
+          <div class="flex-none">
+            <label class="flex cursor-pointer gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+              </svg>
+              <input type="checkbox" value="light" class="toggle theme-controller" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </label>
+          </div>
         </div>
-    </div>
+        <!-- /Navbar -->
 
-    <h1>RPi Dashboard</h1>
-
-    <div class="container">
-
-        <div class="card admin-only admin-panel">
-          <h2>Admin Panel</h2>
-          <p>Quick Links to api's:</p>
-          <button class="button-60" onclick="window.location.href='/api/state';">state</button>
-          <button class="button-60" onclick="window.location.href='/api/system';">system</button>
-          <button class="button-60" onclick="window.location.href='/api/sensors';">sensors</button>
-          <button class="button-60" onclick="window.location.href='/api/fun';">fun</button>
-          <button class="button-60" onclick="window.location.href='/api/weather';">weather</button>
-          <button class="button-60" onclick="window.location.href='/api/network';">network</button>
-          <button class="button-60" onclick="window.location.href='/api/camera';">camera</button>
-          <button class="button-44" id="adminLogout" style="padding:0.6em 1.2em; font-size:14px; width:auto;">Logout</button>
-        </div>
-
-        <div class="card bg-base-200 shadow-xl w-96">
-            <div class="card-body">
-                <h2 class="card-title">System</h2>
-                <div class="flex justify-between">
-                    <span class="text-base-content/60">CPU Usage</span>
-                    <span id="cpu">--</span> %
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-base-content/60">RAM Usage</span>
-                    <span id="ram">--</span> %
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-base-content/60">RAM Speed</span>
-                    <span id="ram_speed">--</span> MHz
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-base-content/60">Temperature</span>
-                    <span id="core_temp">--</span> °C
-                </div>
+        <!-- Admin Modal (outside drawer so it's not blocked) -->
+        <dialog id="adminModal" class="modal">
+          <div class="modal-box">
+            <h3 class="font-bold text-lg mb-2">Admin Login</h3>
+            <input id="adminPassword" type="password" placeholder="password" class="input input-bordered w-full" />
+            <div id="adminMsg" class="mt-2 opacity-85"></div>
+            <div class="modal-action">
+              <form method="dialog">
+                <button class="btn">Cancel</button>
+              </form>
+              <button class="btn btn-primary" id="adminLogin">Login</button>
             </div>
+          </div>
+          <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+          </form>
+        </dialog>
+        <!-- /Admin Modal -->
+
+        <!-- Title -->
+        <div class="text-center">
+          <h1 class="font-title text-2xl md:text-3xl lg:text-4xl font-bold">RPi Dashboard</h1>
         </div>
 
-        <div class="card-center">
-            <button class="button-62" onclick="window.location.href='/site2';">
-                NEWEST FEATURE HERE
-            </button>
-        </div>
+        <!-- ===== CARD GRID ===== -->
+        <div class="flex justify-center p-4">
+        <div class="grid gap-4" style="grid-template-columns: repeat(3, 24rem);">
 
-        <div class="card">
-            <h2>Network</h2>
-            <p>RX: <span id="rx">--</span> kbps</p>
-            <p>TX: <span id="tx">--</span> kbps</p>
-        </div>
+          <!-- System Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">System</h2>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">CPU Usage</span>
+                <span id="cpu">--</span> %
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">RAM Usage</span>
+                <span id="ram">--</span> %
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">RAM Speed</span>
+                <span id="ram_speed">--</span> MHz
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">Temperature</span>
+                <span id="core_temp">--</span> °C
+              </div>
+            </div>
+          </div>
+          <!-- /System Card -->
 
-        <div class="card">
-            <h2>Funny thingys</h2>
-            <h4>Random Insult:</h4>
-            <p><span id="insult">--</span></p>
-            <h4>Random Quote:</h4>
-            <p><span id="quote">--</span></p>
-        </div>
+          <!-- Camera Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">Pi Camera
+                <div class="badge badge-secondary">NEW</div>
+              </h2>
+              <div class="flex justify-between mt-10">
+                <button class="btn btn-primary" onclick="window.location.href='/site2';">
+                  Go to camera page
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- /Camera Card -->
 
-        <div class="card">
-            <h2>Weather in <span id="city">--</span></h2>
-            <h4>Today (<span id="weather_current_date">--</span>)</h4>
-            <p>
-                Temperature: <span id="weather_temp">--</span> °C
+          <!-- Network Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">Network</h2>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">RX</span>
+                <span id="rx">--</span> kbps
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">TX</span>
+                <span id="tx">--</span> kbps
+              </div>
+            </div>
+          </div>
+          <!-- /Network Card -->
+
+          <!-- Fun Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">Funny thingys</h2>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">Random Insult:</span>
+                <span id="insult_display">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">Random Quote:</span>
+                <span id="quote_display">--</span>
+              </div>
+            </div>
+          </div>
+          <!-- /Fun Card -->
+
+          <!-- Sensors Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">External Sensors (in the pi's room)</h2>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">humidity</span>
+                <span id="humidity">--</span> %
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">temperature</span>
+                <span id="temp">--</span> °C
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">air pressure</span>
+                <span id="air pressure">--</span> Pa
+              </div>
+            </div>
+          </div>
+          <!-- /Sensors Card -->
+
+          <!-- Weather Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">Weather in <span id="city">--</span></h2>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">Date:</span>
+                <span id="weather_current_date">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">Temperature</span>
                 (H: <span id="current_high">--</span>° L: <span id="current_low">--</span>°)
-            </p>
-            <p>Condition: <span id="weather_condition">--</span></p>
-
-            <h4>Forecast - Next 2 Days</h4>
-            <p>
-                <strong><span id="forecast_day1_date">Day 1</span>:</strong>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">air pressure</span>
+                <span id="air pressure">--</span> Pa
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60">Condition</span>
+                <span id="weather_condition">--</span>
+              </div>
+              <h4>Forecast - Next 2 Days</h4>
+              <div class="flex justify-between">
+                <span class="text-base-content/60"><strong><span id="forecast_day1_date">Day 1</span>:</strong></span>
                 <span id="forecast_day1_temp">--</span> °C
                 (H: <span id="forecast_day1_high">--</span>° L: <span id="forecast_day1_low">--</span>°)
-            </p>
-            <p>
-                <strong><span id="forecast_day2_date">Day 2</span>:</strong>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-base-content/60"><strong><span id="forecast_day2_date">Day 2</span>:</strong></span>
                 <span id="forecast_day2_temp">--</span> °C
                 (H: <span id="forecast_day2_high">--</span>° L: <span id="forecast_day2_low">--</span>°)
-            </p>
-        </div>
-
-        <div class="card">
-            <h2>External Sensors (in the pi's room)</h2>
-            <p>humidity: <span id="humidity">--</span> %</p>
-            <p>temperature: <span id="temp">--</span> °C</p>
-            <p>air pressure: <span id="pressure">--</span> Pa</p>
-        </div>
-
-        <div class="card">
-            <h2>backend status:</h2>
-            <h4>system: <span id="system-status-indicator">🔴</span></h4>
-            <h4>sensors: <span id="sensors-status-indicator">🔴</span></h4>
-            <h4>network: <span id="network-status-indicator">🔴</span></h4>
-            <h4>weather: <span id="weather-status-indicator">🔴</span></h4>
-            <h4>fun: <span id="fun-status-indicator">🔴</span></h4>
-            <h4>camera: <span id="camera-status-indicator">🔴</span></h4>
-            <p>last photo: <span id="camera-last">--</span></p>
-        </div>
-
-        <div class="card"></div>
-        <div class="card"></div>
-
-        <div class="card">
-            <h2>Comments</h2>
-
-            <input id="commentName"
-                   placeholder="name (optional)"
-                   maxlength="32"
-                   style="width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#111; color:#eee; margin-bottom:10px;box-sizing: border-box;">
-
-            <!-- Honeypot input: bots love filling every field, humans will never even see this -->
-            <input id="website" autocomplete="off" tabindex="-1" style="display:none" />
-
-            <textarea id="commentText"
-                      placeholder="write a comment..."
-                      maxlength="500"
-                      style="width:100%; min-height:90px; padding:10px; border-radius:8px; border:1px solid #333; background:#111; color:#eee; box-sizing: border-box;"></textarea>
-
-            <div style="display:flex; gap:10px; margin-top:10px; align-items:center;">
-                <button class="button-62" id="commentSubmit">Post</button>
-                <span id="commentStatus" style="opacity:0.85;"></span>
+              </div>
             </div>
+          </div>
+          <!-- /Weather Card -->
 
-            <hr style="border:1px solid #333; margin:15px 0;">
-            <div id="commentsList"></div>
+          <!-- Backend Status Card -->
+          <div class="card bg-base-200 shadow-xl w-96">
+            <div class="card-body">
+              <h2 class="card-title">Backend Status</h2>
+              <div class="flex justify-between items-center">
+                <span>system</span>
+                <span id="system-badge" class="badge badge-error">stale</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>sensors</span>
+                <span id="sensors-badge" class="badge badge-error">stale</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>network</span>
+                <span id="network-badge" class="badge badge-error">stale</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>weather</span>
+                <span id="weather-badge" class="badge badge-error">stale</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>fun</span>
+                <span id="fun-badge" class="badge badge-error">stale</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span>camera</span>
+                <span id="camera-badge" class="badge badge-error">stale</span>
+              </div>
+              <p>last photo: <span id="camera-last">--</span></p>
+            </div>
+          </div>
+          <!-- /Backend Status Card -->
+
+          <!-- Comments Card -->
+          <div class="card bg-base-200 shadow-xl col-span-2">
+            <div class="card-body">
+              <h2 class="card-title">Comments</h2>
+              <input id="commentName" placeholder="name (optional)" maxlength="32"
+                     class="input input-bordered w-full mb-2">
+              <input id="website" autocomplete="off" tabindex="-1" style="display:none" />
+              <textarea id="commentText" placeholder="write a comment..." maxlength="500"
+                        class="textarea textarea-bordered w-full"></textarea>
+              <div class="flex gap-2 mt-2 items-center">
+                <button class="btn btn-primary btn-sm" id="commentSubmit">Post</button>
+                <span id="commentStatus" class="opacity-85"></span>
+              </div>
+              <div id="commentsList" class="mt-4"></div>
+            </div>
+          </div>
+          <!-- /Comments Card -->
+
         </div>
+        </div>
+        <!-- /CARD GRID -->
+
+      </div>
+      <!-- /MAIN CONTENT -->
+
+      <!-- ===== SIDEBAR ===== -->
+      <div class="drawer-side">
+        <label for="my-drawer-5" aria-label="close sidebar" class="drawer-overlay"></label>
+        <ul class="menu bg-base-200 min-h-full w-80 p-4">
+          <li id="adminLoginItem"><a id="adminBtn">Admin Login</a></li>
+          <li id="adminLogoutItem" style="display:none;"><a id="adminLogout" class="text-error">Logout</a></li>
+          <li class="admin-only">
+            <ul>
+              <li><a onclick="window.location.href='/api/state';">state</a></li>
+              <li><a onclick="window.location.href='/api/system';">system</a></li>
+              <li><a onclick="window.location.href='/api/sensors';">sensors</a></li>
+              <li><a onclick="window.location.href='/api/fun';">fun</a></li>
+              <li><a onclick="window.location.href='/api/weather';">weather</a></li>
+              <li><a onclick="window.location.href='/api/network';">network</a></li>
+              <li><a onclick="window.location.href='/api/camera';">camera</a></li>
+            </ul>
+          </li>
+          <li><a>Sidebar Item 2</a></li>
+        </ul>
+      </div>
+      <!-- /SIDEBAR -->
 
     </div>
-
-<script>
-/* JS below stays exactly as-is (only touching comments) */
-function setText(id, value) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = value;
-}
-
-function getStatus(timestamp) {
-    if (!timestamp) return "stale";
-    const lastUpdate = new Date(timestamp);
-    const now = new Date();
-    const diffSeconds = (now - lastUpdate) / 1000;
-    return diffSeconds < 30 ? "fresh" : "stale";
-}
-
-function getStatusColor(status) {
-    return status === "fresh" ? "🟢" : "🔴";
-}
-
-async function update() {
-    try {
-        // Grab the latest data from each endpoint
-        const sensors = await fetch("/api/sensors").then(r => r.json());
-        const system  = await fetch("/api/system").then(r => r.json());
-        const network = await fetch("/api/network").then(r => r.json());
-        const fun     = await fetch("/api/fun").then(r => r.json());
-        const weather = await fetch("/api/weather").then(r => r.json());
-
-        // Decide what's "fresh" vs "stale" based on timestamps
-        const systemStatus  = system.timestamp  ? getStatus(system.timestamp)   : "stale";
-        const networkStatus = network.timestamp ? getStatus(network.timestamp)  : "stale";
-        const sensorsStatus = sensors.timestamp ? getStatus(sensors.timestamp)  : "stale";
-        const funStatus     = fun.timestamp     ? getStatus(fun.timestamp)      : "stale";
-        const weatherStatus = weather.timestamp ? getStatus(weather.timestamp)  : "stale";
-
-        // Camera state is its own endpoint
-        const camera = await fetch("/api/camera").then(r => r.json());
-
-        // System box
-        setText("cpu",       system.cpu ?? "--");
-        setText("ram",       system.ram ?? "--");
-        setText("ram_speed", system.ram_speed ?? "--");
-        setText("core_temp", system.core_temp ?? "--");
-
-        // Network box
-        setText("rx", network.rx_kbps ?? "--");
-        setText("tx", network.tx_kbps ?? "--");
-
-        // Fun box
-        setText("quote",    fun.quote ?? "--");
-        setText("insult",   fun.insult ?? "--");
-        setText("coinflip", fun.coinflip ?? "--");
-
-        // Weather box
-        setText("city",                 weather.city ?? "--");
-        setText("weather_temp",         (weather.outside_temp ?? "--"));
-        setText("weather_condition",    weather.condition ?? "--");
-        setText("weather_current_date", weather.current_date ?? "--");
-
-        setText("current_high", (weather.current_high_temp ?? "--"));
-        setText("current_low",  (weather.current_low_temp ?? "--"));
-
-        setText("forecast_day1_date", weather.forecast_day1_date ?? "Day 1");
-        setText("forecast_day1_temp", (weather.forecast_day1_avg_temp ?? "--"));
-        setText("forecast_day1_high", (weather.forecast_day1_high_temp ?? "--"));
-        setText("forecast_day1_low",  (weather.forecast_day1_low_temp ?? "--"));
-
-        setText("forecast_day2_date", weather.forecast_day2_date ?? "Day 2");
-        setText("forecast_day2_temp", (weather.forecast_day2_avg_temp ?? "--"));
-        setText("forecast_day2_high", (weather.forecast_day2_high_temp ?? "--"));
-        setText("forecast_day2_low",  (weather.forecast_day2_low_temp ?? "--"));
-
-        // Status dots (green if recent updates are coming in)
-        setText("system-status-indicator",  getStatusColor(systemStatus));
-        setText("network-status-indicator", getStatusColor(networkStatus));
-        setText("sensors-status-indicator", getStatusColor(sensorsStatus));
-        setText("weather-status-indicator", getStatusColor(weatherStatus));
-        setText("fun-status-indicator",     getStatusColor(funStatus));
-
-        // External sensor values
-        setText("humidity", sensors.humidity ?? "--");
-        setText("temp",     sensors.temp ?? "--");
-        setText("pressure", sensors.pressure ?? "--");
-
-        // Camera info + last capture time
-        setText("camera-last", camera.last_capture ? new Date(camera.last_capture).toLocaleString() : "never");
-        setText("camera-status-indicator", camera.ok ? "🟢" : "🔴");
-    } catch (error) {
-        // If anything breaks, don't kill the page—just log it.
-        console.error("Error fetching dashboard data:", error);
-    }
-}
-
-async function loadComments() {
-  try {
-    const list = document.getElementById("commentsList");
-    if (!list) return;
-
-    // Pull the latest approved comments and redraw the list
-    const comments = await fetch("/api/comments").then(r => r.json());
-    list.innerHTML = "";
-
-    if (!Array.isArray(comments) || comments.length === 0) {
-      const empty = document.createElement("div");
-      empty.textContent = "No comments yet.";
-      empty.style.opacity = "0.8";
-      list.appendChild(empty);
-      return;
-    }
-
-    for (const c of comments) {
-      const wrap = document.createElement("div");
-      wrap.style.padding = "10px";
-      wrap.style.border = "1px solid #333";
-      wrap.style.borderRadius = "8px";
-      wrap.style.marginBottom = "10px";
-      wrap.style.background = "#151515";
-
-      const top = document.createElement("div");
-      top.style.display = "flex";
-      top.style.justifyContent = "space-between";
-      top.style.opacity = "0.85";
-      top.style.fontSize = "14px";
-
-      const name = document.createElement("span");
-      name.textContent = c.name || "anon";
-
-      const time = document.createElement("span");
-      time.textContent = c.created_at || "";
-
-      top.appendChild(name);
-      top.appendChild(time);
-
-      const text = document.createElement("div");
-      text.style.marginTop = "6px";
-      text.style.whiteSpace = "pre-wrap";
-      text.textContent = c.text || "";
-
-      wrap.appendChild(top);
-      wrap.appendChild(text);
-
-      // If you're admin, show a delete button under each comment
-      if (window.__isAdmin) {
-        const actions = document.createElement("div");
-        actions.style.marginTop = "10px";
-
-        const del = document.createElement("button");
-        del.className = "button-44";
-        del.textContent = "Delete";
-        del.style.padding = "0.5em 1em";
-        del.style.fontSize = "14px";
-        del.style.width = "auto";
-
-        del.addEventListener("click", async () => {
-          if (!confirm("Delete this comment?")) return;
-          const res = await fetch(`/api/comments/${c.id}`, { method: "DELETE" });
-          if (res.ok) loadComments();
-          else alert("Delete failed (not admin?)");
-        });
-
-        actions.appendChild(del);
-        wrap.appendChild(actions);
-      }
-
-      list.appendChild(wrap);
-    }
-  } catch (e) {
-    console.error("loadComments failed:", e);
-  }
-}
-
-async function postComment() {
-  const status = document.getElementById("commentStatus");
-  const nameEl = document.getElementById("commentName");
-  const textEl = document.getElementById("commentText");
-  if (!textEl) return;
-
-  // Build payload (website field is a hidden honeypot)
-  const payload = {
-    name: (nameEl?.value || "").trim(),
-    text: (textEl.value || "").trim(),
-    website: (document.getElementById("website")?.value || "")
-  };
-
-  if (!payload.text) {
-    if (status) status.textContent = "write something first.";
-    return;
-  }
-
-  if (status) status.textContent = "posting...";
-
-  try {
-    const res = await fetch("/api/comments", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify(payload)
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    // Server returns helpful error strings, so show them
-    if (!res.ok) {
-      if (status) status.textContent = data.error || "failed.";
-      return;
-    }
-
-    // Clear input and reload the comment list
-    textEl.value = "";
-    if (status) status.textContent = "posted ✅";
-    await loadComments();
-  } catch (e) {
-    console.error(e);
-    if (status) status.textContent = "error.";
-  }
-}
-
-document.getElementById("commentSubmit")?.addEventListener("click", postComment);
-
-window.__isAdmin = false;
-
-function openAdminModal() {
-  // Show modal + backdrop and put cursor in the password box
-  document.getElementById("modalBackdrop").style.display = "block";
-  document.getElementById("adminModal").style.display = "block";
-  document.getElementById("adminPassword").value = "";
-  document.getElementById("adminMsg").textContent = "";
-  document.getElementById("adminPassword").focus();
-}
-
-function closeAdminModal() {
-  // Hide modal + backdrop
-  document.getElementById("modalBackdrop").style.display = "none";
-  document.getElementById("adminModal").style.display = "none";
-}
-
-async function refreshAdminState() {
-  try {
-    // Ask backend if our session is admin, then toggle UI bits
-    const me = await fetch("/api/admin/me").then(r => r.json());
-    window.__isAdmin = !!me.is_admin;
-    document.body.classList.toggle("admin-on", window.__isAdmin);
-
-    const btn = document.getElementById("adminBtn");
-    if (btn) btn.textContent = window.__isAdmin ? "Admin ✅" : "Admin";
-
-    loadComments();
-  } catch (e) {
-    console.error("refreshAdminState failed:", e);
-  }
-}
-
-async function adminLogin() {
-  const msg = document.getElementById("adminMsg");
-  const pw = document.getElementById("adminPassword").value;
-
-  msg.textContent = "logging in...";
-  const res = await fetch("/api/admin/login", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ password: pw })
-  });
-
-  if (!res.ok) {
-    msg.textContent = "wrong password.";
-    return;
-  }
-
-  closeAdminModal();
-  await refreshAdminState();
-}
-
-async function adminLogout() {
-  // Quick confirm so you don't fat-finger it
-  if (!confirm("Logout of admin session?")) return;
-  await fetch("/api/admin/logout", { method: "POST" });
-  await refreshAdminState();
-}
-
-document.getElementById("adminBtn")?.addEventListener("click", () => {
-  // Same button does two things: login when logged out, logout when logged in
-  if (window.__isAdmin) adminLogout();
-  else openAdminModal();
-});
-
-document.getElementById("adminCancel")?.addEventListener("click", closeAdminModal);
-document.getElementById("modalBackdrop")?.addEventListener("click", closeAdminModal);
-document.getElementById("adminLogin")?.addEventListener("click", adminLogin);
-document.getElementById("adminLogout")?.addEventListener("click", adminLogout);
-
-document.getElementById("adminPassword")?.addEventListener("keydown", (e) => {
-  // Enter key should submit the login, because of course it should
-  if (e.key === "Enter") adminLogin();
-});
-
-// On page load: figure out if we're already admin (session cookie)
-refreshAdminState();
-
-// Keep comments reasonably fresh without hammering the backend too hard
-setInterval(loadComments, 10000);
-loadComments();
-
-// Main dashboard refresh loop
-setInterval(update, 1000);
-update();
-</script>
-
-</body>
+  </body>
 </html>
-
