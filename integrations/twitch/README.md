@@ -27,6 +27,16 @@ The main page's miner badge is **only in Backend Status**, identified by
 the compact numbers in the Twitch card. Fresh + `running` means live; delayed,
 login-needed, stale and failed requests cannot leave the badge green.
 
+Twitch CSS/JS URLs include `?v=` followed by the first 12 characters of that
+file's SHA-256. Cloudflare was observed giving JavaScript a four-hour browser
+cache lifetime even though Flask sent `no-cache`. An unchanged URL could pair
+the new HTML with an old script that still looked for `twitch-summary-status`,
+leaving the main card empty and the new badge stale. Versioned URLs make a normal
+reload fetch the matching asset. When editing a Twitch asset, update its version
+in the referring HTML (`web/index.html` for the summary script;
+`web/twitch/index.html` for station CSS/JS). Compute it with `sha256sum FILE`
+and use the first 12 characters. Stats APIs remain `no-store`.
+
 The detailed page also has a Backend Status card, plus the Channel Learning table.
 `web/twitch/script.js` renders all data as text, styles statuses using DaisyUI
 badges and draws its SVG chart with CSS theme tokens. Form/input IDs are the JS
