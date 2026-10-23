@@ -160,6 +160,25 @@ def record_prediction(account, event, at=None):
               event.get("result"), event.get("profit"), at, at))
 
 
+def resolve_prediction(account, event_id, result):
+    """A result may arrive after a restart, without an upstream in-memory event."""
+    kind = result.get("type")
+    won = result.get("points_won") or 0
+    if kind not in ("WIN", "LOSE", "REFUND") or type(won) is not int or won < 0:
+        return False
+    with database() as connection:
+        previous = connection.execute(
+            "SELECT stake,confirmed FROM predictions WHERE account=? AND event_id=?",
+            (account, event_id)).fetchone()
+        if not previous or not previous["confirmed"]:
+            return False
+        profit = 0 if kind == "REFUND" else won - previous["stake"]
+        connection.execute(
+            "UPDATE predictions SET result=?,profit=?,updated_at=? WHERE account=? AND event_id=?",
+            (kind, profit, int(time.time()), account, event_id))
+    return True
+
+
 def dashboard():
     settings = config()
     worker = read_json("status.json")

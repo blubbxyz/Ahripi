@@ -83,7 +83,8 @@ function render(data) {
     const row = node("tr");
     const first = node("td"); first.append(node("strong", event.channel), node("span", event.title, "channel-title"));
     const state = node("td");
-    const label = event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : event.choice ? "Considering" : "Observing";
+    const closed = ["LOCKED", "RESOLVED", "CANCELED", "CANCELLED"].includes(event.status);
+    const label = event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
     state.append(node("span", label, "badge " + (event.result === "WIN" ? "win" : event.result === "LOSE" ? "lose" : "pending")));
     row.append(first, node("td", event.choice || "—"), node("td", event.stake ? number(event.stake) : "—"), state,
       node("td", event.profit === null ? "—" : signed(event.profit), event.profit > 0 ? "positive" : event.profit < 0 ? "negative" : ""), node("td", date(event.updated_at)));

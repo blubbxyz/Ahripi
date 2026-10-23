@@ -58,6 +58,8 @@ The local `AHRIPI_HELPER.md` is also explicitly ignored by Git.
 - Upstream SMART strategy, at most **1%** of the current channel balance.
 - Hard configuration cap: **500 points per bet** by default.
 - Require a balance of **1,000 points** before betting.
+- Consider an active prediction 15 seconds after it opens, rather than waiting
+  for the final seconds when a streamer may already have locked it.
 - Community-goal contributions, drops, and chat participation disabled.
 - TLS certificate verification remains enabled.
 

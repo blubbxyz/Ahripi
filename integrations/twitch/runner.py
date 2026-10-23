@@ -150,6 +150,7 @@ def main():
         from TwitchChannelPointsMiner.classes.Chat import ChatPresence
         from TwitchChannelPointsMiner.classes.Settings import Priority
         from TwitchChannelPointsMiner.classes.Twitch import Twitch
+        from TwitchChannelPointsMiner.classes.WebSocketsPool import WebSocketsPool
         from TwitchChannelPointsMiner.classes.entities.Bet import BetSettings, DelayMode, Strategy
         from TwitchChannelPointsMiner.classes.entities.Streamer import StreamerSettings
         from TwitchChannelPointsMiner.logger import LoggerSettings
@@ -170,6 +171,32 @@ def main():
             apply_credentials(twitch, saved)
 
         Twitch.login = login
+
+        original_message = WebSocketsPool.on_message
+
+        def observe_message(websocket, message):
+            original_message(websocket, message)
+            try:
+                payload = json.loads(message)
+                if payload.get("type") != "MESSAGE":
+                    return
+                envelope = payload["data"]
+                if not envelope.get("topic", "").startswith("predictions-user-v1."):
+                    return
+                event_message = json.loads(envelope["message"])
+                prediction = event_message["data"]["prediction"]
+                event_id = prediction["event_id"]
+                event = websocket.events_predictions.get(event_id)
+                if event is not None:
+                    # Persist confirmation/results immediately, not just on the
+                    # five-second timer, so a restart doesn't lose a confirmed bet.
+                    store.record_prediction(settings["username"], prediction_snapshot(event))
+                if event_message["type"] == "prediction-result":
+                    store.resolve_prediction(settings["username"], event_id, prediction["result"])
+            except (ValueError, KeyError, TypeError, OSError):
+                log.warning("Could not record a prediction update.")
+
+        WebSocketsPool.on_message = staticmethod(observe_message)
         miner = TwitchChannelPointsMiner(
             username=settings["username"], enable_analytics=False,
             claim_drops_startup=False, priority=[Priority.STREAK, Priority.ORDER],
@@ -182,7 +209,9 @@ def main():
                 community_goals=False, chat=ChatPresence.NEVER,
                 bet=BetSettings(strategy=Strategy.SMART, percentage=settings["bet_percentage"],
                     max_points=settings["bet_max_points"], minimum_points=settings["bet_min_balance"],
-                    stealth_mode=False, delay_mode=DelayMode.FROM_END, delay=6)))
+                    # Streamers can lock predictions early; don't wait until the
+                    # final seconds of an advertised window to submit a wager.
+                    stealth_mode=False, delay_mode=DelayMode.FROM_START, delay=15)))
         for handler in logging.getLogger().handlers:
             handler.setLevel(logging.INFO)
         with STATE_LOCK:

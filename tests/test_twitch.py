@@ -122,6 +122,16 @@ class TwitchTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/twitch/history?channel=unknown").status_code, 400)
         self.assertEqual(self.client.get("/api/twitch/history?channel=test_channel&hours=999999").status_code, 400)
 
+    def test_confirmed_prediction_results_can_arrive_after_worker_restart(self):
+        event = {"id":"restart_bet", "channel":"test_channel", "title":"Win?",
+                 "status":"LOCKED", "choice":"Yes", "stake":100, "confirmed":True}
+        for kind, payout, expected in [("WIN",175,75),("LOSE",0,-100),("REFUND",100,0)]:
+            store.record_prediction("test_viewer", event)
+            store.init_database()
+            self.assertTrue(store.resolve_prediction("test_viewer", "restart_bet", {"type":kind,"points_won":payout}))
+            self.assertEqual(store.dashboard()["predictions"][0]["profit"], expected)
+        self.assertFalse(store.resolve_prediction("test_viewer", "unknown_event", {"type":"WIN","points_won":999}))
+
     def test_page_is_public_and_contains_no_configured_channel_or_credentials(self):
         response = self.client.get("/twitch/")
         self.assertEqual(response.status_code, 200)
