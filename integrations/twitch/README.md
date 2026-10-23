@@ -2,8 +2,27 @@
 
 Public statistics at **https://www.pinode.dev/twitch/** and
 **https://dev.pinode.dev/twitch/**. The main dashboard's two-column card and
-sidebar link here. All configured channels are visible, as requested. Twitch
+sidebar link here. The page stays public; selected channel identities are
+redacted for visitors. Admins see the original details after login. Twitch
 authorization and settings require the existing dashboard admin login.
+
+### Visitor redaction
+
+The ignored, private runtime file `data/twitch/visibility.json` contains a
+`redacted_channels` array of Twitch channel names. Keep the actual list out of
+public source. Both Flask apps read the shared file on each request; the worker
+configuration and statistics are unchanged.
+
+The API substitutes numbered aliases for those channels in visitor responses,
+removes stream titles/games and identifying prediction text/IDs, and scrubs names
+from free text such as worker messages. Channel balances, charts and aggregate
+totals remain public. History accepts the aliases; original names require the
+admin session. Malformed visibility files fail closed. This hides identities on
+the website; the retained statistics are not a guarantee against inference.
+
+The browser never receives the original names as a visitor. Login refreshes the
+details immediately; logout clears private table, chart and settings values
+before fetching the visitor snapshot again. This policy does not lock the page.
 
 The worker runs independently of Flask as `rpi-dashboard-twitch.service`. It uses
 [rdavydov's successor](https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2),
@@ -71,6 +90,7 @@ All state lives under `/home/blubb/ahripi-dev/data/twitch/`:
 | File | Purpose |
 | --- | --- |
 | `config.json` | Account, channels, prediction limits |
+| `visibility.json` | Private list of channel identities to redact for visitors |
 | `credentials.json` | Private OAuth access/refresh tokens; never served by Flask |
 | `auth-status.json` | Temporary activation code, only available through an admin API |
 | `status.json` | Worker heartbeat; public API returns a strict subset of fields |
@@ -201,8 +221,8 @@ integration's Python modules and website files have been installed.
 
 | Route | Access |
 | --- | --- |
-| `GET /api/twitch` | Public status, totals, channels, latest prediction activity |
-| `GET /api/twitch/history?channel=NAME&hours=24` | Public history; hours limited to 1, 24, or 168 |
+| `GET /api/twitch` | Public status/totals with visitor redactions; full details for admins |
+| `GET /api/twitch/history?channel=NAME&hours=24` | Public history by visible name/alias; hours limited to 1, 24, or 168 |
 | `GET /api/twitch/settings` | Admin |
 | `POST /api/twitch/settings` | Admin, JSON and `X-Ahripi-Request: 1` |
 | `GET /api/twitch/auth` | Admin; activation code, never access/refresh tokens |

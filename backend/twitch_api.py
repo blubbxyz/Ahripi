@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 from flask import Blueprint, jsonify, request, send_from_directory, session
 
 import twitch_store as store
+import twitch_privacy as privacy
 
 twitch = Blueprint("twitch", __name__)
 WEB = Path(__file__).resolve().parents[1] / "web/twitch"
@@ -37,7 +38,10 @@ def page():
 @twitch.get("/api/twitch")
 def stats():
     try:
-        return jsonify(store.dashboard())
+        snapshot = store.dashboard()
+        if session.get("is_admin") is not True:
+            snapshot = privacy.redact(snapshot, privacy.channel_aliases())
+        return jsonify(snapshot)
     except (sqlite3.Error, OSError, ValueError):
         return jsonify(error="Twitch statistics are temporarily unavailable."), 503
 
@@ -48,7 +52,10 @@ def history():
         hours = int(request.args.get("hours", "24"))
         if hours not in (1, 24, 168):
             raise ValueError("Choose 1, 24, or 168 hours.")
-        return jsonify(store.history(request.args.get("channel", ""), hours))
+        channel = request.args.get("channel", "")
+        if session.get("is_admin") is not True:
+            channel = privacy.history_channel(channel, privacy.channel_aliases())
+        return jsonify(store.history(channel, hours))
     except ValueError as error:
         return jsonify(error=str(error)), 400
     except (sqlite3.Error, OSError):

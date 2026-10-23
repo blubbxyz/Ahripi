@@ -10,6 +10,7 @@ const number = value => new Intl.NumberFormat().format(value);
 const signed = value => (value > 0 ? "+" : "") + number(value);
 const date = value => value ? new Date(value * 1000).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
 let isAdmin = false;
+let statsVersion = 0;
 let historyVersion = 0;
 let lastHistory = 0;
 
@@ -63,10 +64,13 @@ function render(data) {
   $("channels").replaceChildren(...data.channels.map(channel => {
     const row = node("tr");
     const nameCell = node("td");
-    const link = node("a", channel.name, "link link-hover");
-    link.href = "https://www.twitch.tv/" + encodeURIComponent(channel.name);
-    link.target = "_blank"; link.rel = "noopener noreferrer";
-    nameCell.append(link);
+    if (channel.redacted) nameCell.append(node("span", channel.display_name));
+    else {
+      const link = node("a", channel.name, "link link-hover");
+      link.href = "https://www.twitch.tv/" + encodeURIComponent(channel.name);
+      link.target = "_blank"; link.rel = "noopener noreferrer";
+      nameCell.append(link);
+    }
     if (channel.game) nameCell.append(node("span", channel.game, "channel-title"));
     const statusCell = node("td");
     statusCell.append(node("span", channel.stale ? "stale" : (channel.online ? "live" : "offline"), "badge " + (channel.stale ? "badge-error" : channel.online ? "badge-success" : "badge-ghost")));
@@ -80,12 +84,12 @@ function render(data) {
 
   const current = $("chart-channel").value;
   if (Array.from($("chart-channel").options).map(option => option.value).join(",") !== data.channels.map(channel => channel.name).join(",")) {
-    $("chart-channel").replaceChildren(...data.channels.map(channel => { const option = node("option", channel.name); option.value = channel.name; return option; }));
+    $("chart-channel").replaceChildren(...data.channels.map(channel => { const option = node("option", channel.display_name || channel.name); option.value = channel.name; return option; }));
     if (data.channels.some(channel => channel.name === current)) $("chart-channel").value = current;
   }
   const predictions = data.predictions.map(event => {
     const row = node("tr");
-    const first = node("td"); first.append(node("strong", event.channel), node("span", event.title, "channel-title"));
+    const first = node("td"); first.append(node("strong", event.channel_display_name || event.channel), node("span", event.title, "channel-title"));
     const state = node("td");
     const closed = ["LOCKED", "RESOLVED", "CANCELED", "CANCELLED"].includes(event.status);
     const paper = event.learning_mode === "paper" && !event.confirmed;
@@ -105,11 +109,19 @@ function render(data) {
     const explanation = node("td", channel.mode === "live" ? "Small stakes eligible" : "Paper trials");
     explanation.append(node("small", channel.reason, "channel-title"));
     if (channel.lower_bound !== null) explanation.append(node("small", `Last lower estimate: ${Math.round(channel.lower_bound*100)}%`, "channel-title"));
-    row.append(node("td", channel.name), node("td", `${channel.trials} / ${data.learning.min_trials} minimum`),
+    row.append(node("td", channel.display_name || channel.name), node("td", `${channel.trials} / ${data.learning.min_trials} minimum`),
       node("td", `${channel.wins} / ${channel.trials}`), node("td", signed(channel.paper_profit)), explanation);
     return row;
   });
   $("learning").replaceChildren(...learningRows);
+}
+
+async function refreshStats() {
+  const version = ++statsVersion;
+  const data = await api("/api/twitch");
+  if (version !== statsVersion) return false;
+  render(data);
+  return true;
 }
 
 async function loadHistory() {
@@ -141,6 +153,7 @@ async function loadHistory() {
 
 async function loadSettings() {
   const data = await api("/api/twitch/settings");
+  if (!isAdmin) return;
   $("username").value = data.username;
   $("channel-list").value = data.channels.join("\n");
   $("enable-predictions").checked = data.predictions;
@@ -152,6 +165,7 @@ async function loadSettings() {
 async function loadAuth() {
   if (!isAdmin) return;
   const auth = await api("/api/twitch/auth");
+  if (!isAdmin) return;
   $("activation").hidden = !auth.code || auth.expires_at <= Date.now()/1000;
   $("auth-code").textContent = auth.code || "";
   $("auth-message").textContent = auth.message || "";
@@ -173,10 +187,21 @@ $("login-form").addEventListener("submit", async event => {
     const me = await api("/api/admin/me");
     if (!me.is_admin) throw new Error("Use the HTTPS dev website so the admin cookie can be saved.");
     isAdmin = true; $("admin-button").textContent = "Settings"; $("login-dialog").close(); $("settings-panel").hidden = false;
+    if (await refreshStats()) await loadHistory();
     await loadSettings(); await loadAuth(); $("settings-panel").scrollIntoView({behavior:"smooth"});
   } catch(error) { $("login-error").textContent = error.message; }
 });
-$("logout").addEventListener("click", async () => { await api("/api/admin/logout", {method:"POST"}); isAdmin=false; $("settings-panel").hidden=true; $("activation").hidden=true; $("auth-code").textContent=""; $("admin-button").textContent="Admin Login"; });
+$("logout").addEventListener("click", async () => {
+  await api("/api/admin/logout", {method:"POST"});
+  isAdmin = false; ++statsVersion; ++historyVersion;
+  $("settings-panel").hidden = true; $("settings-form").reset();
+  $("activation").hidden = true; $("auth-code").textContent = "";
+  $("auth-message").textContent = ""; $("admin-button").textContent = "Admin Login";
+  // Clear private DOM values immediately, even if the visitor refresh fails.
+  for (const id of ["channels", "learning", "predictions", "chart-channel", "chart", "notice"]) $(id).replaceChildren();
+  try { if (await refreshStats()) await loadHistory(); }
+  catch (error) { $("notice").hidden = false; $("notice").textContent = error.message; }
+});
 $("settings-form").addEventListener("submit", async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
   try {
@@ -189,12 +214,12 @@ for (const id of ["period","chart-channel"]) $(id).addEventListener("change", ()
 
 async function poll() {
   try {
-    render(await api("/api/twitch"));
+    if (!await refreshStats()) return;
     $("refresh-status").textContent = "Updated " + new Date().toLocaleTimeString();
     if (Date.now() - lastHistory > 30000) {await loadHistory(); lastHistory=Date.now();}
     await loadAuth();
   } catch(error) { $("notice").hidden=false; $("notice").textContent=error.message+" Retrying…"; $("service-state").textContent="unavailable"; $("service-state").className="badge badge-error"; }
-  setTimeout(poll, 5000);
+  finally { setTimeout(poll, 5000); }
 }
 api("/api/admin/me").then(async me=>{isAdmin=me.is_admin; if(isAdmin){$("admin-button").textContent="Settings"; await loadAuth();}}).catch(()=>{});
 poll();
