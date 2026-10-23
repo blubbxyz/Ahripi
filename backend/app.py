@@ -20,6 +20,9 @@ STATIC_DIR = os.path.join(WEB_DIR, "static")
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="/static")
 CORS(app)
 
+from twitch_api import twitch
+app.register_blueprint(twitch)
+
 app.secret_key = os.getenv("SECRET_KEY", "dev-insecure-change-me")
 app.config.update(
     SESSION_COOKIE_SECURE=True,      # only send cookie over https

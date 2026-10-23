@@ -21,3 +21,9 @@ data/pi-cam/*.jpg
 Thumbs.db
 .vscode/
 .idea/
+
+# Local server orientation notes
+/AHRIPI_HELPER.md
+
+# Twitch credentials, cookies, analytics and runtime state
+/data/twitch/
