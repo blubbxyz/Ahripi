@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
+    <script src="/twitch-summary.js" defer></script>
     <style>
       /* Hide admin-only items by default, show when logged in */
       .admin-only { display: none; }
@@ -109,18 +110,6 @@
             </div>
           </div>
           <!-- /Camera Card -->
-
-          <!-- Twitch Card -->
-          <div class="card bg-base-200 shadow-xl w-96">
-            <div class="card-body">
-              <h2 class="card-title">Twitch Points</h2>
-              <p>Channel points, predictions, and bot statistics.</p>
-              <div class="card-actions mt-4">
-                <a class="btn btn-primary" href="/twitch/">Open Twitch station</a>
-              </div>
-            </div>
-          </div>
-          <!-- /Twitch Card -->
 
           <!-- Network Card -->
           <div class="card bg-base-200 shadow-xl w-96">
@@ -242,8 +231,25 @@
           </div>
           <!-- /Backend Status Card -->
 
-          <!-- Comments Card -->
+          <!-- Twitch Card -->
           <div class="card bg-base-200 shadow-xl col-span-2">
+            <div class="card-body">
+              <h2 class="card-title">Twitch Points <span class="badge badge-secondary">NEW</span></h2>
+              <div class="flex justify-between items-center"><span>Miner</span><span id="twitch-summary-status" class="badge badge-error">connecting</span></div>
+              <div class="grid grid-cols-2 gap-4 mt-2">
+                <div><span class="text-base-content/60">Channel balances</span><div id="twitch-summary-balance" class="text-xl font-bold">--</div></div>
+                <div><span class="text-base-content/60">Tracked change</span><div id="twitch-summary-change" class="text-xl font-bold">--</div></div>
+                <div><span class="text-base-content/60">Prediction P/L</span><div id="twitch-summary-profit">--</div></div>
+                <div><span class="text-base-content/60">Wins / losses</span><div id="twitch-summary-results">--</div></div>
+              </div>
+              <p id="twitch-summary-channels" class="text-sm text-base-content/60">Waiting for live statistics...</p>
+              <div class="card-actions mt-2"><a class="btn btn-primary" href="/twitch/">Open Twitch station</a></div>
+            </div>
+          </div>
+          <!-- /Twitch Card -->
+
+          <!-- Comments Card -->
+          <div class="card bg-base-200 shadow-xl col-span-3">
             <div class="card-body">
               <h2 class="card-title">Comments</h2>
               <input id="commentName" placeholder="name (optional)" maxlength="32"
