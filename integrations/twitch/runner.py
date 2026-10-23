@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import signal
+import sqlite3
 import sys
 import threading
 import time
@@ -15,6 +16,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 import twitch_store as store
+import twitch_learning as learning
 from auth import credentials
 
 log = logging.getLogger("ahripi.twitch")
@@ -108,7 +110,7 @@ def monitor(miner, settings):
                 progress("running", f"Monitoring {len(miner.streamers)} channels; {online} live.")
             else:
                 progress("degraded", "Miner is running; some Twitch updates are unavailable.")
-        except (requests.RequestException, ValueError, OSError, KeyError, TypeError):
+        except (requests.RequestException, ValueError, OSError, KeyError, TypeError, sqlite3.Error):
             # Do not expose HTTP bodies/headers or tokens in public diagnostics.
             log.warning("Statistics update failed; retrying.")
             progress("degraded", "Waiting for fresh Twitch updates; retrying automatically.")
@@ -172,6 +174,28 @@ def main():
 
         Twitch.login = login
 
+        original_prediction = Twitch.make_predictions
+
+        def learned_prediction(twitch, event):
+            """Every scheduled prediction passes the durable paper/live gate.
+
+            Failures NEVER fall back to upstream SMART betting. The per-event
+            settings copy avoids one channel's stake leaking into another timer.
+            """
+            if event.status != "ACTIVE":
+                return
+            try:
+                plan = learning.execute(event, settings,
+                    lambda selected: original_prediction(twitch, selected),
+                    Strategy.NUMBER_1, Strategy.NUMBER_2)
+                if plan and plan["mode"] != "live":
+                    log.info("Paper trial for %s: %s", event.streamer.username, plan["reason"])
+                store.record_prediction(settings["username"], prediction_snapshot(event))
+            except (ValueError, KeyError, TypeError, StopIteration, sqlite3.Error, OSError):
+                log.warning("Learning gate could not evaluate %s; no wager submitted.", event.streamer.username)
+
+        Twitch.make_predictions = learned_prediction
+
         original_message = WebSocketsPool.on_message
 
         def observe_message(websocket, message):
@@ -181,9 +205,15 @@ def main():
                 if payload.get("type") != "MESSAGE":
                     return
                 envelope = payload["data"]
+                event_message = json.loads(envelope["message"])
+                if envelope.get("topic", "").startswith("predictions-channel-v1."):
+                    # Channel results are essential for PAPER trials: unlike
+                    # predictions-user-v1, they arrive even when we spend zero.
+                    event_data = event_message["data"]["event"]
+                    learning.resolve_event(settings["username"], event_data)
+                    return
                 if not envelope.get("topic", "").startswith("predictions-user-v1."):
                     return
-                event_message = json.loads(envelope["message"])
                 prediction = event_message["data"]["prediction"]
                 event_id = prediction["event_id"]
                 event = websocket.events_predictions.get(event_id)
@@ -193,7 +223,7 @@ def main():
                     store.record_prediction(settings["username"], prediction_snapshot(event))
                 if event_message["type"] == "prediction-result":
                     store.resolve_prediction(settings["username"], event_id, prediction["result"])
-            except (ValueError, KeyError, TypeError, OSError):
+            except (ValueError, KeyError, TypeError, OSError, sqlite3.Error):
                 log.warning("Could not record a prediction update.")
 
         WebSocketsPool.on_message = staticmethod(observe_message)
@@ -208,7 +238,10 @@ def main():
                 claim_drops=False, claim_moments=False, watch_streak=True,
                 community_goals=False, chat=ChatPresence.NEVER,
                 bet=BetSettings(strategy=Strategy.SMART, percentage=settings["bet_percentage"],
-                    max_points=settings["bet_max_points"], minimum_points=settings["bet_min_balance"],
+                    max_points=min(settings["bet_max_points"], learning.MAX_STAKE),
+                    # Observe paper trials even at zero balance. The learning
+                    # gate above enforces the user's reserve before REAL stakes.
+                    minimum_points=-1,
                     # Streamers can lock predictions early; don't wait until the
                     # final seconds of an advertised window to submit a wager.
                     stealth_mode=False, delay_mode=DelayMode.FROM_START, delay=15)))

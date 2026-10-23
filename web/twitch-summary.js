@@ -1,6 +1,12 @@
-/* Compact dashboard view of the same public statistics as Twitch station. */
+/**
+ * Fetch the same public snapshot used by Twitch Station every ten seconds.
+ * Numeric summaries belong to the wide Twitch card; worker health belongs to
+ * #twitch-badge in Backend Status. Do not add a second status badge to the card.
+ * A fresh heartbeat alone isn't sufficient: the worker must report "running".
+ */
 (function () {
   const get = id => document.getElementById("twitch-summary-" + id);
+  const badge = document.getElementById("twitch-badge");
   const format = value => new Intl.NumberFormat().format(value);
   const signed = value => (value > 0 ? "+" : "") + format(value);
   async function refresh() {
@@ -11,8 +17,10 @@
       const known = data.channels.filter(channel => channel.balance !== null);
       const live = data.channels.filter(channel => channel.online && !channel.stale).length;
       const running = data.worker.state === "running" && !data.worker.stale;
-      get("status").textContent = running ? "live" : data.worker.stale ? "stale" : "starting";
-      get("status").className = "badge " + (running ? "badge-success" : "badge-error");
+      const state = data.worker.stale ? "stale" : data.worker.state;
+      const labels = {needs_auth: "login needed", degraded: "delayed", error: "retrying", validating: "checking login", restarting: "restarting", stopping: "stopping"};
+      badge.textContent = running ? "live" : labels[state] || (state === "starting" ? "starting" : "stale");
+      badge.className = "badge " + (running ? "badge-success" : "badge-error");
       get("balance").textContent = known.length ? format(data.totals.balance) : "--";
       get("change").textContent = known.length ? signed(known.reduce((sum, channel) => sum + channel.balance - channel.baseline, 0)) : "--";
       const bets = data.totals.betting;
@@ -20,10 +28,11 @@
       get("results").textContent = `${bets.wins} W / ${bets.losses} L · ${bets.pending} pending`;
       get("channels").textContent = `${data.channels.length} channels tracked · ${live} live · ${bets.bets} confirmed bets`;
     } catch (error) {
-      get("status").textContent = "unavailable";
-      get("status").className = "badge badge-error";
+      // Keep saved numbers visible, but never leave a green badge after failure.
+      badge.textContent = "unavailable";
+      badge.className = "badge badge-error";
     }
     setTimeout(refresh, 10000);
   }
-  if (get("status")) refresh();
+  if (badge && get("balance")) refresh();
 })();
