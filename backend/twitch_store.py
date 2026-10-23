@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULTS = {
     "username": "", "channels": [], "predictions": True,
-    "bet_percentage": 1, "bet_max_points": 500, "bet_min_balance": 1000,
+    "bet_percentage": 1, "bet_max_points": 50, "bet_min_balance": 1000,
 }
 NAME = re.compile(r"^[a-z0-9_]{1,25}$")
 
@@ -117,6 +117,19 @@ def init_database():
                 first_seen INTEGER NOT NULL, updated_at INTEGER NOT NULL,
                 PRIMARY KEY(account, event_id)
             );
+            -- Immutable pre-result snapshots train twitch_learning.py. Real
+            -- stakes are reserved here before submission, including failures.
+            CREATE TABLE IF NOT EXISTS learning_trials (
+                account TEXT NOT NULL, event_id TEXT NOT NULL, channel TEXT NOT NULL,
+                title TEXT NOT NULL, context TEXT NOT NULL, snapshot TEXT NOT NULL,
+                choice_id TEXT NOT NULL, choice_title TEXT NOT NULL,
+                mode TEXT NOT NULL, reason TEXT NOT NULL, stake INTEGER NOT NULL,
+                lower_bound REAL, edge REAL, created_at INTEGER NOT NULL,
+                resolved_at INTEGER, winner_id TEXT, outcome TEXT,
+                paper_profit REAL, PRIMARY KEY(account,event_id)
+            );
+            CREATE INDEX IF NOT EXISTS learning_channel_time
+                ON learning_trials(account,channel,created_at);
         """)
     (data_dir() / "stats.db").chmod(0o600)
 
@@ -223,7 +236,19 @@ def dashboard():
                 betting["losses"] += row["result"] == "LOSE"
                 betting["profit"] += row["profit"] or 0
                 betting["pending"] += bool(row["confirmed"] and not row["result"])
-    return {"worker": worker, "channels": ordered, "predictions": predictions,
+    # Import here to keep the learner/store dependency one-way at module startup.
+    from twitch_learning import summary as learning_summary
+    learning = learning_summary(settings["username"], settings["channels"])
+    trials = {trial["event_id"]: trial for trial in learning.pop("recent", [])}
+    for event in predictions:
+        trial = trials.get(event["event_id"])
+        if trial:
+            event["learning_mode"] = trial["mode"]
+            event["learning_reason"] = trial["reason"]
+            event["trial_outcome"] = trial["outcome"]
+            event["trial_profit"] = trial["paper_profit"]
+            event["trial_choice"] = trial["choice_title"]
+    return {"worker": worker, "channels": ordered, "predictions": predictions, "learning": learning,
             "totals": {"balance": sum(row["balance"] or 0 for row in ordered),
                        "earned": sum(row["earned"] for row in ordered), "today": today,
                        "watched_minutes": sum(row["watched_minutes"] for row in ordered),

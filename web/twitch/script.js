@@ -1,5 +1,10 @@
 "use strict";
 
+/** Twitch Station uses the dashboard's DaisyUI classes and secure admin session.
+ * Public values are rendered with textContent; auth codes are fetched only after
+ * admin checks. Stats and history have separate polling rates to limit Pi load.
+ */
+
 const $ = id => document.getElementById(id);
 const number = value => new Intl.NumberFormat().format(value);
 const signed = value => (value > 0 ? "+" : "") + number(value);
@@ -34,7 +39,7 @@ function render(data) {
   const running = worker.state === "running" && !worker.stale;
   const labels = {starting:"Starting",needs_auth:"Awaiting Twitch login",running:"Miner online",degraded:"Updates delayed",error:"Retrying",stopping:"Stopping",restarting:"Restarting",validating:"Checking login"};
   $("service-state").textContent = worker.stale ? "Miner not reporting" : (labels[worker.state] || "Waiting for setup");
-  $("service-dot").className = "dot " + (running ? "live" : "warning");
+  $("service-state").className = "badge " + (running ? "badge-success" : "badge-error");
   $("updated").textContent = worker.updated_at ? "Last heartbeat " + date(worker.updated_at) : "No heartbeat yet";
   $("notice").hidden = running;
   $("notice").textContent = worker.stale ? "The miner is not sending fresh updates. Saved statistics remain visible." : (worker.message || "The miner has not reported yet.");
@@ -53,19 +58,18 @@ function render(data) {
   $("session-start").textContent = date(worker.started_at);
   amount("today", known ? data.totals.today : null);
   amount("pending", betting.pending);
-  $("policy").textContent = data.policy.predictions ? `${data.policy.bet_percentage}% · ${number(data.policy.bet_max_points)} points max` : "Predictions off";
+  $("policy").textContent = data.policy.predictions ? `Paper first · ${number(Math.min(data.policy.bet_max_points, data.learning?.max_stake || 50))} points max` : "Predictions off";
 
   $("channels").replaceChildren(...data.channels.map(channel => {
     const row = node("tr");
     const nameCell = node("td");
-    const link = node("a", undefined, "channel-name");
+    const link = node("a", channel.name, "link link-hover");
     link.href = "https://www.twitch.tv/" + encodeURIComponent(channel.name);
     link.target = "_blank"; link.rel = "noopener noreferrer";
-    link.append(node("span", channel.name.slice(0, 1), "avatar"), node("span", channel.name));
     nameCell.append(link);
     if (channel.game) nameCell.append(node("span", channel.game, "channel-title"));
     const statusCell = node("td");
-    statusCell.append(node("span", channel.stale ? "Waiting / stale" : (channel.online ? "Live" : "Offline"), "status " + (channel.online && !channel.stale ? "live" : "")));
+    statusCell.append(node("span", channel.stale ? "stale" : (channel.online ? "live" : "offline"), "badge " + (channel.stale ? "badge-error" : channel.online ? "badge-success" : "badge-ghost")));
     const balance = node("td", channel.balance === null ? "—" : number(channel.balance));
     const change = channel.balance === null ? null : channel.balance - channel.baseline;
     const delta = node("td", change === null ? "—" : signed(change), change > 0 ? "positive" : (change < 0 ? "negative" : ""));
@@ -84,14 +88,28 @@ function render(data) {
     const first = node("td"); first.append(node("strong", event.channel), node("span", event.title, "channel-title"));
     const state = node("td");
     const closed = ["LOCKED", "RESOLVED", "CANCELED", "CANCELLED"].includes(event.status);
-    const label = event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
-    state.append(node("span", label, "badge " + (event.result === "WIN" ? "win" : event.result === "LOSE" ? "lose" : "pending")));
-    row.append(first, node("td", event.choice || "—"), node("td", event.stake ? number(event.stake) : "—"), state,
+    const paper = event.learning_mode === "paper" && !event.confirmed;
+    const label = paper ? (event.trial_outcome ? "Trial: " + event.trial_outcome.toLowerCase() : "Paper trial") : event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
+    state.append(node("span", label, "badge " + (paper ? "badge-ghost" : event.result === "WIN" ? "badge-success" : event.result === "LOSE" ? "badge-error" : "badge-secondary")));
+    if (event.learning_reason) state.title = event.learning_reason;
+    row.append(first, node("td", event.trial_choice || event.choice || "—"), node("td", paper ? "0 (simulated)" : event.stake ? number(event.stake) : "—"), state,
       node("td", event.profit === null ? "—" : signed(event.profit), event.profit > 0 ? "positive" : event.profit < 0 ? "negative" : ""), node("td", date(event.updated_at)));
     return row;
   });
   if (!predictions.length) { const row = node("tr"); const cell = node("td", "No predictions observed yet. Bets appear when a channel starts a prediction.", "empty"); cell.colSpan = 6; row.append(cell); predictions.push(row); }
   $("predictions").replaceChildren(...predictions);
+
+  // Trials are shown separately: a simulated return must not inflate real P/L.
+  const learningRows = (data.learning?.channels || []).map(channel => {
+    const row = node("tr");
+    const explanation = node("td", channel.mode === "live" ? "Small stakes eligible" : "Paper trials");
+    explanation.append(node("small", channel.reason, "channel-title"));
+    if (channel.lower_bound !== null) explanation.append(node("small", `Last lower estimate: ${Math.round(channel.lower_bound*100)}%`, "channel-title"));
+    row.append(node("td", channel.name), node("td", `${channel.trials} / ${data.learning.min_trials} minimum`),
+      node("td", `${channel.wins} / ${channel.trials}`), node("td", signed(channel.paper_profit)), explanation);
+    return row;
+  });
+  $("learning").replaceChildren(...learningRows);
 }
 
 async function loadHistory() {
@@ -115,10 +133,10 @@ async function loadHistory() {
   const svg = (tag, attrs, text) => {const element = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value); if (text !== undefined) element.textContent = text; return element;};
   for (let index = 0; index < 3; index++) {
     const y = 21 + index * 87;
-    $("chart").append(svg("line", {x1:48,x2:626,y1:y,y2:y,stroke:"#272b39","stroke-dasharray":"3 5"}));
-    $("chart").append(svg("text", {x:0,y:y+4,fill:"#929bb0","font-size":10}, new Intl.NumberFormat(undefined,{notation:"compact"}).format(high + padding - index * (high - low + padding * 2) / 2)));
+    $("chart").append(svg("line", {x1:48,x2:626,y1:y,y2:y,class:"chart-grid","stroke-dasharray":"3 5"}));
+    $("chart").append(svg("text", {x:0,y:y+4,class:"chart-label"}, number(Math.round(high + padding - index * (high - low + padding * 2) / 2))));
   }
-  $("chart").append(svg("polygon", {points:`48,210 ${points} 626,210`,fill:"#b6a0ff0c"}), svg("polyline", {points,fill:"none",stroke:"#b6a0ff","stroke-width":2,"stroke-linejoin":"round"}));
+  $("chart").append(svg("polygon", {points:`48,210 ${points} 626,210`,class:"chart-area"}), svg("polyline", {points,fill:"none",class:"chart-line","stroke-width":2,"stroke-linejoin":"round"}));
 }
 
 async function loadSettings() {
@@ -141,6 +159,8 @@ async function loadAuth() {
 }
 
 $("admin-button").addEventListener("click", async () => {
+  // Close the settings drawer before opening the same modal as the dashboard.
+  $("twitch-drawer").checked = false;
   if (isAdmin) { $("settings-panel").hidden = !$("settings-panel").hidden; if (!$("settings-panel").hidden) {await loadSettings(); $("settings-panel").scrollIntoView({behavior:"smooth"});} }
   else { $("login-dialog").showModal(); $("password").focus(); }
 });
@@ -156,7 +176,7 @@ $("login-form").addEventListener("submit", async event => {
     await loadSettings(); await loadAuth(); $("settings-panel").scrollIntoView({behavior:"smooth"});
   } catch(error) { $("login-error").textContent = error.message; }
 });
-$("logout").addEventListener("click", async () => { await api("/api/admin/logout", {method:"POST"}); isAdmin=false; $("settings-panel").hidden=true; $("activation").hidden=true; $("auth-code").textContent=""; $("admin-button").textContent="Admin"; });
+$("logout").addEventListener("click", async () => { await api("/api/admin/logout", {method:"POST"}); isAdmin=false; $("settings-panel").hidden=true; $("activation").hidden=true; $("auth-code").textContent=""; $("admin-button").textContent="Admin Login"; });
 $("settings-form").addEventListener("submit", async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
   try {
@@ -173,7 +193,7 @@ async function poll() {
     $("refresh-status").textContent = "Updated " + new Date().toLocaleTimeString();
     if (Date.now() - lastHistory > 30000) {await loadHistory(); lastHistory=Date.now();}
     await loadAuth();
-  } catch(error) { $("notice").hidden=false; $("notice").textContent=error.message+" Retrying…"; $("service-dot").className="dot warning"; }
+  } catch(error) { $("notice").hidden=false; $("notice").textContent=error.message+" Retrying…"; $("service-state").textContent="unavailable"; $("service-state").className="badge badge-error"; }
   setTimeout(poll, 5000);
 }
 api("/api/admin/me").then(async me=>{isAdmin=me.is_admin; if(isAdmin){$("admin-button").textContent="Settings"; await loadAuth();}}).catch(()=>{});

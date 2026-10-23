@@ -6,8 +6,26 @@
 Returning to this project? The local, Git-ignored server guide is at
 `/home/blubb/AHRIPI_HELPER.md` on the Pi.
 
-Twitch points and predictions: visit `/twitch/` on the dev website. See the
+Twitch points and predictions: visit `/twitch/` on either website. See the
 [Twitch integration guide](integrations/twitch/README.md) for setup and maintenance.
+
+The two-column Twitch card shows a compact points/betting summary. Miner health
+appears alongside the other collectors in **Backend Status**. Twitch Station uses
+the same DaisyUI 4 cards, spacing, buttons, theme toggle and settings drawer as the
+main dashboard. The graph and admin controls work in both light and dark themes.
+
+Predictions now start with **paper trials per channel**. The learner records a
+choice before the result, then calibrates against resolved outcomes for that
+channel, game, question, outcome label and crowd-share bucket. Real stakes require
+20 resolved recent channel trials, at least 12 matching observations, positive
+simulated returns and a conservative estimated edge. Initial stakes are 10 points;
+further evidence can raise them to 25 or 50, within a 100-point daily stake budget
+per channel. This is an experimental statistical policy, not a proven predictor.
+
+Implementation: `backend/twitch_learning.py` owns the model and spending gates;
+`integrations/twitch/runner.py` connects them to Twitch; `web/twitch-summary.js`
+updates the main card and Backend Status; `web/twitch/` renders the detailed view.
+Tests use temporary databases: `./venv/bin/python -m unittest discover -s tests -v`.
 
 PiNode Hub is a self-hosted Raspberry Pi project that acts as a small production
 and development hub. It combines a Flask backend, a browser-based dashboard,
