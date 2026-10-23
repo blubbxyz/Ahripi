@@ -149,6 +149,83 @@ class TwitchTests(unittest.TestCase):
     def test_config_permissions_are_private(self):
         self.assertEqual((store.data_dir() / "config.json").stat().st_mode & 0o777, 0o600)
 
+    def redacted_channels(self):
+        names = ["private_alpha", "private_beta"]
+        self.settings = store.validate_config({**self.settings, "channels": ["test_channel", *names]})
+        store.write_json("config.json", self.settings)
+        store.write_json("visibility.json", {"redacted_channels": names})
+        now = int(time.time())
+        self.sample(50, now)
+        for name in names:
+            for at, balance in [(now - 120, 1000), (now, 1020)]:
+                store.record_channel("test_viewer", name, balance=balance, online=True,
+                                     title="Identifying stream title", game="Identifying game", at=at)
+            store.record_prediction("test_viewer", {
+                "id": name + "_event", "channel": name, "title": "Identifying prediction",
+                "choice": "Identifying outcome", "stake": 10, "status": "ACTIVE", "confirmed": True,
+            })
+        store.write_json("status.json", {"state": "running", "updated_at": now,
+                                        "message": "Checking PRIVATE_ALPHA and private_beta"})
+        return names
+
+    def test_visitor_redaction_covers_channels_predictions_learning_and_messages(self):
+        names = self.redacted_channels()
+        response = self.client.get("/api/twitch")
+        self.assertEqual(response.status_code, 200)
+        for identifying in [*names, "Identifying stream title", "Identifying game",
+                            "Identifying prediction", "Identifying outcome"]:
+            self.assertNotIn(identifying.lower(), response.text.lower())
+        self.assertEqual(response.json["channels"][0]["name"], "test_channel")
+        for index, channel in enumerate(response.json["channels"][1:], 1):
+            self.assertEqual(channel["name"], f"redacted-channel-{index}")
+            self.assertEqual(channel["display_name"], f"Redacted channel {index}")
+            self.assertTrue(channel["redacted"])
+            self.assertEqual(channel["balance"], 1020)
+            self.assertIsNone(channel["title"])
+            self.assertIsNone(channel["game"])
+        self.assertTrue(all("event_id" not in event for event in response.json["predictions"]))
+        self.assertEqual(response.json["learning"]["channels"][1]["name"], "redacted-channel-1")
+        self.assertEqual(response.headers["Cache-Control"], "no-store")
+
+    def test_admin_keeps_original_details_and_totals_match_visitor_snapshot(self):
+        names = self.redacted_channels()
+        public = self.client.get("/api/twitch").json
+        self.login()
+        response = self.client.get("/api/twitch")
+        self.assertEqual(response.json["totals"], public["totals"])
+        self.assertEqual([row["name"] for row in response.json["channels"]], ["test_channel", *names])
+        self.assertEqual(response.json["channels"][1]["game"], "Identifying game")
+        self.assertEqual(response.json["predictions"][0]["title"], "Identifying prediction")
+        self.assertEqual(store.config()["channels"], ["test_channel", *names])
+        with self.client.session_transaction() as session:
+            session.clear()
+        response = self.client.get("/api/twitch")
+        for name in names:
+            self.assertNotIn(name, response.text)
+
+    def test_redacted_history_works_by_alias_and_real_names_require_admin(self):
+        names = self.redacted_channels()
+        for index, name in enumerate(names, 1):
+            response = self.client.get(f"/api/twitch/history?channel=redacted-channel-{index}&hours=1")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([point["balance"] for point in response.json], [1000, 1020])
+            response = self.client.get(f"/api/twitch/history?channel={name}&hours=1")
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.json, {"error": "Unknown channel."})
+        self.assertEqual(self.client.get("/api/twitch/history?channel=test_channel").status_code, 200)
+        self.login()
+        for name in names:
+            self.assertEqual(self.client.get(f"/api/twitch/history?channel={name}").status_code, 200)
+
+    def test_invalid_visibility_file_never_falls_back_to_exposing_names(self):
+        self.redacted_channels()
+        for content in ["{broken", "[]", '{"redacted_channels": "invalid"}']:
+            (store.data_dir() / "visibility.json").write_text(content)
+            self.assertEqual(self.client.get("/api/twitch").status_code, 503)
+            self.assertEqual(self.client.get("/api/twitch/history?channel=private_alpha").status_code, 400)
+        self.login()
+        self.assertEqual(self.client.get("/api/twitch").status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
