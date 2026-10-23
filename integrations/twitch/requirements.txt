@@ -1,0 +1,3 @@
+# Upstream successor recommended by Tkd-Alex's original repository. Pinned revision.
+Twitch-Channel-Points-Miner-v2 @ git+https://github.com/rdavydov/Twitch-Channel-Points-Miner-v2.git@8a35f87cd5345074003c7f6eedb48aedadc3b9b3
+validators==0.36.0

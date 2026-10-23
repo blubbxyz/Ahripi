@@ -1,0 +1,24 @@
+[Unit]
+Description=Ahripi Twitch channel points miner
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=blubb
+WorkingDirectory=/home/blubb/ahripi-dev
+Environment=TWITCH_DATA_DIR=/home/blubb/ahripi-dev/data/twitch
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/blubb/twitch-miner/venv/bin/python /home/blubb/ahripi-dev/integrations/twitch/runner.py
+Restart=always
+RestartSec=15
+TimeoutStopSec=90
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/blubb/ahripi-dev/data/twitch
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Twitch station · PiNode</title>
+  <link rel="icon" href="/web/static/favicon.ico">
+  <link rel="stylesheet" href="/twitch/style.css">
+  <script src="/twitch/script.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">PiNode<span class="brand-dot"></span></a>
+    <nav aria-label="Main navigation"><a href="/">Dashboard</a><a class="active" href="/twitch/">Twitch station</a></nav>
+    <button id="admin-button" class="button subtle" type="button">Admin</button>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">RUNNING ON A RASPBERRY PI</p><h1>Twitch station<span>.</span></h1>
+        <p class="muted">Channel points, prediction plays, and the numbers behind them.</p></div>
+      <div class="service-box" role="status" aria-live="polite"><span id="service-dot" class="dot"></span><div><strong id="service-state">Connecting</strong><small id="updated">Checking the miner…</small></div></div>
+    </section>
+
+    <div id="notice" class="notice" role="status" hidden></div>
+    <section class="metrics" aria-label="Overall statistics">
+      <article class="metric"><span>Total channel balances</span><strong id="total-balance">—</strong><small id="channel-count">Waiting for channels</small></article>
+      <article class="metric"><span>Tracked balance change</span><strong id="total-net">—</strong><small>Since tracking began, including bets</small></article>
+      <article class="metric"><span>Prediction profit / loss</span><strong id="bet-profit">—</strong><small id="bet-count">No confirmed bets yet</small></article>
+      <article class="metric"><span>Prediction win rate</span><strong id="win-rate">—</strong><small id="win-count">Waiting for resolved predictions</small></article>
+    </section>
+
+    <section class="panel channels-panel">
+      <div class="section-heading"><div><p class="eyebrow">THE WATCHLIST</p><h2>Channel overview</h2></div><span id="live-count" class="pill">Waiting</span></div>
+      <div class="table-scroll"><table><thead><tr><th>Channel</th><th>Status</th><th>Balance</th><th>Tracked change</th><th>Watch time</th></tr></thead><tbody id="channels"><tr><td colspan="5" class="empty">Waiting for the miner’s first update.</td></tr></tbody></table></div>
+      <p class="footnote">Points belong to each channel separately. Watch time is reported by the miner; stale readings are marked.</p>
+    </section>
+
+    <div class="detail-grid">
+      <section class="panel">
+        <div class="section-heading"><div><p class="eyebrow">POINTS OVER TIME</p><h2>Balance history</h2></div><select id="period" aria-label="History period"><option value="1">Last hour</option><option value="24" selected>24 hours</option><option value="168">7 days</option></select></div>
+        <label class="sr-only" for="chart-channel">Channel</label><select id="chart-channel"><option value="">Choose a channel</option></select>
+        <div class="chart-box"><svg id="chart" viewBox="0 0 640 220" role="img" aria-label="Channel points balance history" hidden></svg><p id="chart-empty" class="empty">History will appear after the first balance update.</p></div>
+        <div class="chart-labels"><span id="chart-start">—</span><span id="chart-end">—</span></div>
+      </section>
+      <section class="panel session-panel">
+        <p class="eyebrow">MINER DETAILS</p><h2>At a glance</h2>
+        <dl><div><dt>Session started</dt><dd id="session-start">—</dd></div><div><dt>Balance increases today</dt><dd id="today">—</dd></div><div><dt>Confirmed bets awaiting result</dt><dd id="pending">—</dd></div><div><dt>Prediction settings</dt><dd id="policy">—</dd></div></dl>
+        <p class="footnote">Balance change compares the latest balance with the first recorded balance. Increases include payouts and refunds; prediction P/L subtracts the stake. These are observed statistics, not lifetime Twitch earnings.</p>
+      </section>
+    </div>
+
+    <section class="panel">
+      <div class="section-heading"><div><p class="eyebrow">THE PLAY-BY-PLAY</p><h2>Predictions &amp; results</h2></div><span class="pill">Latest 100</span></div>
+      <div class="table-scroll"><table><thead><tr><th>Channel / prediction</th><th>Bot’s pick</th><th>Stake</th><th>State</th><th>Profit / loss</th><th>Updated</th></tr></thead><tbody id="predictions"><tr><td colspan="6" class="empty">No predictions observed yet. Bets appear when a channel starts a prediction.</td></tr></tbody></table></div>
+      <p class="footnote">A considered outcome is shown separately from a bet confirmed by Twitch. Results stay saved when the miner restarts.</p>
+    </section>
+
+    <section id="settings-panel" class="panel settings-panel" hidden>
+      <div class="section-heading"><div><p class="eyebrow">ADMIN ONLY</p><h2>Miner settings</h2></div><button id="logout" class="button subtle" type="button">Log out</button></div>
+      <div id="activation" class="activation" hidden><div><strong>Connect your Twitch account</strong><p id="auth-message"></p><a id="activate-link" class="button" href="https://www.twitch.tv/activate" target="_blank" rel="noopener noreferrer">Open Twitch activation ↗</a></div><div><code id="auth-code"></code><small id="auth-expires"></small></div></div>
+      <form id="settings-form">
+        <div class="form-grid"><label>Twitch username<input id="username" name="username" autocomplete="off" required maxlength="25"></label><label class="wide">Channels, one per line<textarea id="channel-list" rows="4" required spellcheck="false"></textarea></label></div>
+        <label class="check"><input id="enable-predictions" type="checkbox"> Automatically enter channel-point predictions</label>
+        <div class="form-grid"><label>Balance percentage per bet<input id="bet-percentage" type="number" min="1" max="10" required></label><label>Maximum points per bet<input id="bet-max" type="number" min="10" max="10000" required></label><label>Minimum balance to bet<input id="bet-min" type="number" min="1000" max="10000000" required></label></div>
+        <div class="form-actions"><button class="button" type="submit">Save &amp; apply</button><span id="settings-message" role="status"></span></div>
+        <p class="footnote">Changing settings restarts the miner. Public visitors can read statistics; only admins can change settings or see the Twitch activation code.</p>
+      </form>
+    </section>
+    <footer><span>PiNode · Twitch station</span><span id="refresh-status">Updates every 5 seconds</span></footer>
+  </main>
+
+  <dialog id="login-dialog"><form id="login-form"><p class="eyebrow">PINODE ADMIN</p><h2>Manage the miner</h2><p class="muted">Use your existing dashboard admin password.</p><label>Password<input id="password" type="password" autocomplete="current-password" required></label><p id="login-error" role="alert"></p><div class="form-actions"><button class="button" type="submit">Sign in</button><button class="button subtle" id="cancel-login" type="button">Cancel</button></div></form></dialog>
+</body>
+</html>

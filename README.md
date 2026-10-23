@@ -3,6 +3,12 @@
 
 # PiNode Hub (Ahripi)
 
+Returning to this project? The local, Git-ignored server guide is at
+`/home/blubb/AHRIPI_HELPER.md` on the Pi.
+
+Twitch points and predictions: visit `/twitch/` on the dev website. See the
+[Twitch integration guide](integrations/twitch/README.md) for setup and maintenance.
+
 PiNode Hub is a self-hosted Raspberry Pi project that acts as a small production
 and development hub. It combines a Flask backend, a browser-based dashboard,
 background data collectors, and optional hardware features such as sensors and
