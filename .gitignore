@@ -24,6 +24,7 @@ Thumbs.db
 
 # Local server orientation notes
 /AHRIPI_HELPER.md
+/AHRIPI_PHONE_HANDOFF_*.txt
 
 # Twitch credentials, cookies, analytics and runtime state
 /data/twitch/
