@@ -8,7 +8,7 @@
 const $ = id => document.getElementById(id);
 const number = value => new Intl.NumberFormat().format(value);
 const signed = value => (value > 0 ? "+" : "") + number(value);
-const date = value => value ? new Date(value * 1000).toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
+const date = (value, full = false) => value ? new Date(value * 1000).toLocaleString([], {year:full ? "numeric" : undefined,month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}) : "—";
 let isAdmin = false;
 let statsVersion = 0;
 let historyVersion = 0;
@@ -134,8 +134,8 @@ async function loadHistory() {
   $("chart").toggleAttribute("hidden", data.length < 2);
   $("chart-empty").hidden = data.length >= 2;
   $("chart-empty").textContent = data.length ? "First reading saved. Waiting for the next update…" : "History will appear after the first balance update.";
-  $("chart-start").textContent = date(data[0]?.at);
-  $("chart-end").textContent = date(data.at(-1)?.at);
+  $("chart-start").textContent = date(data[0]?.at, $("period").value === "all");
+  $("chart-end").textContent = date(data.at(-1)?.at, $("period").value === "all");
   if (data.length < 2) return;
   const low = Math.min(...data.map(point => point.balance));
   const high = Math.max(...data.map(point => point.balance));

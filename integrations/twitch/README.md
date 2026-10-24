@@ -63,7 +63,10 @@ contract; keep them in sync when editing the HTML.
 
 - Current balance and live/offline status for each configured channel.
 - Balance changes since this installation first recorded each channel.
-- A 1-hour / 24-hour / 7-day balance graph, retained for 30 days.
+- A 1-hour / 24-hour / 7-day / All time balance graph. Balance samples are kept
+  for the full tracking history; the former 30-day deletion rule is removed.
+  Every chart response contains at most 180 points, including the exact first
+  and latest readings in the selected range. All-time date labels include years.
 - Watch time reported by the miner, accumulated across worker restarts.
 - Prediction title, chosen outcome, considered versus confirmed stake, result,
   wins/losses, and net prediction profit after subtracting the stake.
@@ -230,7 +233,7 @@ integration's Python modules and website files have been installed.
 | Route | Access |
 | --- | --- |
 | `GET /api/twitch` | Public status/totals with visitor redactions; full details for admins |
-| `GET /api/twitch/history?channel=NAME&hours=24` | Public history by visible name/alias; hours limited to 1, 24, or 168 |
+| `GET /api/twitch/history?channel=NAME&hours=24` | Public history by visible name/alias; hours accepts 1, 24, 168, or `all` |
 | `GET /api/twitch/settings` | Admin |
 | `POST /api/twitch/settings` | Admin, JSON and `X-Ahripi-Request: 1` |
 | `GET /api/twitch/auth` | Admin; activation code, never access/refresh tokens |

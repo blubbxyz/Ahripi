@@ -10,7 +10,7 @@
   <link rel="icon" href="/web/static/favicon.ico">
   <!-- Keep these content versions in sync when CSS/JS changes; see the integration guide. -->
   <link rel="stylesheet" href="/twitch/style.css?v=d2f577b67183">
-  <script src="/twitch/script.js?v=3f5a7a034dc2" defer></script>
+  <script src="/twitch/script.js?v=db526b5b273a" defer></script>
 </head>
 <body>
   <div class="drawer drawer-end">
@@ -61,7 +61,7 @@
               <h2 class="card-title">Balance History</h2>
               <div class="flex flex-wrap gap-2">
                 <label class="sr-only" for="chart-channel">Channel</label><select id="chart-channel" class="select select-bordered"><option value="">Choose a channel</option></select>
-                <select id="period" class="select select-bordered" aria-label="History period"><option value="1">Last hour</option><option value="24" selected>24 hours</option><option value="168">7 days</option></select>
+                <select id="period" class="select select-bordered" aria-label="History period"><option value="1">Last hour</option><option value="24" selected>24 hours</option><option value="168">7 days</option><option value="all">All time</option></select>
               </div>
               <div class="chart-box"><svg id="chart" viewBox="0 0 640 220" role="img" aria-label="Channel points balance history" hidden></svg><p id="chart-empty" class="text-sm text-base-content/60">History will appear after the first balance update.</p></div>
               <div class="flex justify-between text-xs text-base-content/60"><span id="chart-start">--</span><span id="chart-end">--</span></div>

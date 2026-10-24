@@ -49,9 +49,10 @@ def stats():
 @twitch.get("/api/twitch/history")
 def history():
     try:
-        hours = int(request.args.get("hours", "24"))
-        if hours not in (1, 24, 168):
-            raise ValueError("Choose 1, 24, or 168 hours.")
+        period = request.args.get("hours", "24")
+        hours = None if period == "all" else int(period)
+        if hours is not None and hours not in (1, 24, 168):
+            raise ValueError("Choose 1, 24, 168 hours, or all.")
         channel = request.args.get("channel", "")
         if session.get("is_admin") is not True:
             channel = privacy.history_channel(channel, privacy.channel_aliases())

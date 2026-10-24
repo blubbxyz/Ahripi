@@ -149,6 +149,47 @@ class TwitchTests(unittest.TestCase):
     def test_config_permissions_are_private(self):
         self.assertEqual((store.data_dir() / "config.json").stat().st_mode & 0o777, 0o600)
 
+    def test_all_time_retains_samples_older_than_thirty_days(self):
+        path = "/api/twitch/history?channel=test_channel&hours=all"
+        self.assertEqual(self.client.get(path).json, [])
+        now = int(time.time())
+        self.sample(10000, now - 120 * 86400)
+        self.sample(10020, now)
+        response = self.client.get(path)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([point["balance"] for point in response.json], [10000, 10020])
+        for hours in (1, 24, 168):
+            response = self.client.get(f"/api/twitch/history?channel=test_channel&hours={hours}")
+            self.assertEqual([point["balance"] for point in response.json], [10020])
+        self.assertEqual(self.client.get("/api/twitch/history?channel=test_channel&hours=0").status_code, 400)
+
+    def test_all_time_is_bounded_and_keeps_exact_first_and_last_readings(self):
+        now = int(time.time())
+        first = now - 120 * 86400
+        self.sample(10000, first)
+        with store.database() as connection:
+            connection.executemany("INSERT INTO samples(account,channel,at,balance,delta) VALUES(?,?,?,?,?)",
+                [("test_viewer", "test_channel", first + index * 10000, 10000 + index, 1)
+                 for index in range(1, 1000)])
+        self.sample(20000, now)
+        response = self.client.get("/api/twitch/history?channel=test_channel&hours=all")
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual(len(response.json), 180)
+        self.assertEqual(response.json[0], {"at": first, "balance": 10000})
+        self.assertEqual(response.json[-1], {"at": now, "balance": 20000})
+        times = [point["at"] for point in response.json]
+        self.assertEqual(times, sorted(times))
+
+    def test_all_time_preserves_visitor_history_redactions(self):
+        names = self.redacted_channels()
+        for index, name in enumerate(names, 1):
+            response = self.client.get(f"/api/twitch/history?channel=redacted-channel-{index}&hours=all")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([point["balance"] for point in response.json], [1000, 1020])
+            self.assertEqual(self.client.get(f"/api/twitch/history?channel={name}&hours=all").status_code, 400)
+        self.login()
+        self.assertEqual(self.client.get(f"/api/twitch/history?channel={names[0]}&hours=all").status_code, 200)
+
     def redacted_channels(self):
         names = ["private_alpha", "private_beta"]
         self.settings = store.validate_config({**self.settings, "channels": ["test_channel", *names]})
