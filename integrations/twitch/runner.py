@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 import twitch_store as store
 import twitch_learning as learning
 from auth import credentials
+from prediction_timing import EarlyPredictions, prediction_open
 
 log = logging.getLogger("ahripi.twitch")
 STOP = threading.Event()
@@ -182,11 +183,16 @@ def main():
             Failures NEVER fall back to upstream SMART betting. The per-event
             settings copy avoids one channel's stake leaking into another timer.
             """
-            if event.status != "ACTIVE":
+            if STOP.is_set() or not prediction_open(event):
                 return
             try:
+                def submit_if_open(selected):
+                    # SQLite comparison/reservation can outlast a short window.
+                    if not STOP.is_set() and prediction_open(selected):
+                        original_prediction(twitch, selected)
+
                 plan = learning.execute(event, settings,
-                    lambda selected: original_prediction(twitch, selected),
+                    submit_if_open,
                     Strategy.NUMBER_1, Strategy.NUMBER_2)
                 if plan and plan["mode"] != "live":
                     log.info("Paper trial for %s: %s", event.streamer.username, plan["reason"])
@@ -194,7 +200,12 @@ def main():
             except (ValueError, KeyError, TypeError, StopIteration, sqlite3.Error, OSError):
                 log.warning("Learning gate could not evaluate %s; no wager submitted.", event.streamer.username)
 
-        Twitch.make_predictions = learned_prediction
+        early_predictions = EarlyPredictions(learned_prediction, STOP)
+
+        def schedule_prediction(twitch, event):
+            return early_predictions.schedule(twitch, event)
+
+        Twitch.make_predictions = schedule_prediction
 
         original_message = WebSocketsPool.on_message
 
@@ -211,6 +222,11 @@ def main():
                     # predictions-user-v1, they arrive even when we spend zero.
                     event_data = event_message["data"]["event"]
                     learning.resolve_event(settings["username"], event_data)
+                    event = websocket.events_predictions.get(event_data["id"])
+                    if event is not None and event_data["status"] == "ACTIVE":
+                        # Creation may have an empty pool. Every active update
+                        # gets another chance until one immutable decision exists.
+                        early_predictions.schedule(websocket.twitch, event)
                     return
                 if not envelope.get("topic", "").startswith("predictions-user-v1."):
                     return
@@ -242,9 +258,11 @@ def main():
                     # Observe paper trials even at zero balance. The learning
                     # gate above enforces the user's reserve before REAL stakes.
                     minimum_points=-1,
-                    # Streamers can lock predictions early; don't wait until the
-                    # final seconds of an advertised window to submit a wager.
-                    stealth_mode=False, delay_mode=DelayMode.FROM_START, delay=15)))
+                    # Preserve the actual closing deadline: FROM_START + zero
+                    # causes upstream to reject events as already expired.
+                    # Messages above trigger evaluation immediately; upstream's
+                    # deadline timer becomes a harmless, guarded no-op.
+                    stealth_mode=False, delay_mode=DelayMode.FROM_END, delay=0)))
         for handler in logging.getLogger().handlers:
             handler.setLevel(logging.INFO)
         with STATE_LOCK:

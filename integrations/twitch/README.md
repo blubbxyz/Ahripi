@@ -110,7 +110,7 @@ until they pass the paper-trial gates**. The old unconditional SMART strategy ha
 been replaced by `backend/twitch_learning.py`; upstream only submits a selected
 outcome after that module authorizes a bounded real stake.
 
-- Record both outcomes and pool/voter counts 15 seconds after opening. Entry
+- Record both outcomes and pool/voter counts as soon as usable market data arrives. Entry
   snapshots are immutable and keyed by account + event ID.
 - Resolve trials only from an explicit Twitch winner or cancellation. A cancelled
   or unresolved event never becomes a training win. Missing outcome data stays
@@ -149,8 +149,16 @@ The UI calls it a “lower estimate” and shows trial counts and skip reasons.
 
 ### Worker settings
 
-- Consider an active prediction 15 seconds after it opens, rather than waiting
-  for the final seconds when a streamer may already have locked it.
+- Evaluate new predictions immediately on receipt, without a fixed delay. If the
+  opening pool is empty, retry when an active market update arrives. Comparisons
+  run in a background thread so websocket updates/results keep flowing. Five- and
+  ten-second windows are eligible while still open, including late discovery.
+- Keep the upstream event's full closing deadline (`FROM_END`, zero delay).
+  `FROM_START` with zero delay makes upstream discard new events as expired.
+  Message-driven evaluation runs immediately; the old deadline timer is guarded
+  against expired/decided events. Duplicate updates cannot submit concurrent bets.
+  Confidence, participant minimums, reserves and stake budgets still apply; no
+  artificial wait does not guarantee Twitch accepts a bet before an early lock.
 - Community-goal contributions, drops, and chat participation disabled.
 - TLS certificate verification remains enabled.
 
