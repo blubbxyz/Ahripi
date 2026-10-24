@@ -153,8 +153,8 @@ def record_channel(account, channel, *, balance, online, title, game, watched_mi
               bool(online), title, game, watched_minutes, at, at))
         connection.execute("INSERT INTO samples(account,channel,at,balance,delta) VALUES(?,?,?,?,?)",
                            (account, channel, at, balance, delta))
-        connection.execute("DELETE FROM samples WHERE account=? AND channel=? AND at<?",
-                           (account, channel, at - 30 * 86400))
+        # Keep the full history for the All time chart. Responses are downsampled
+        # in history(), so retained samples do not enlarge the browser payload.
 
 
 def record_prediction(account, event, at=None):
@@ -257,26 +257,39 @@ def dashboard():
 
 
 def history(channel, hours=24):
+    """Return at most 180 points, including endpoints; None means all time."""
     settings = config()
     if channel not in settings["channels"]:
         raise ValueError("Unknown channel.")
     if not (data_dir() / "stats.db").exists():
         return []
     with database(readonly=True) as connection:
-        since = int(time.time()) - hours * 3600
-        extent = connection.execute(
-            "SELECT MIN(at),MAX(at) FROM samples WHERE account=? AND channel=? AND at>=?",
+        # Keep endpoints and buckets on one WAL snapshot while the miner writes.
+        connection.execute("BEGIN")
+        since = 0 if hours is None else int(time.time()) - hours * 3600
+        first = connection.execute(
+            "SELECT at,balance FROM samples WHERE account=? AND channel=? AND at>=? ORDER BY at,id LIMIT 1",
             (settings["username"], channel, since)).fetchone()
-        if extent[0] is None:
+        if first is None:
             return []
+        last = connection.execute(
+            "SELECT at,balance FROM samples WHERE account=? AND channel=? AND at>=? ORDER BY at DESC,id DESC LIMIT 1",
+            (settings["username"], channel, since)).fetchone()
         # Use the available span so a new installation needn't wait eight minutes
         # for a second point merely because the selected window is 24 hours.
-        bucket = max(60, (extent[1] - extent[0]) // 180)
+        # Align 178 buckets to the first sample and reserve two endpoint slots.
+        span = last["at"] - first["at"] + 1
+        bucket = max(60, (span + 177) // 178)
         rows = connection.execute("""
             SELECT s.at,s.balance FROM samples AS s JOIN (
                 SELECT MAX(id) AS id FROM samples
                 WHERE account=? AND channel=? AND at>=?
-                GROUP BY CAST(at / ? AS INTEGER)
+                GROUP BY CAST((at - ?) / ? AS INTEGER)
             ) AS recent ON s.id=recent.id ORDER BY s.at
-        """, (settings["username"], channel, since, bucket))
-        return [dict(row) for row in rows]
+        """, (settings["username"], channel, since, first["at"], bucket))
+        points = [dict(row) for row in rows]
+        if points[0] != dict(first):
+            points.insert(0, dict(first))
+        if points[-1] != dict(last):
+            points.append(dict(last))
+        return points
