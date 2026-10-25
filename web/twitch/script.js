@@ -59,7 +59,7 @@ function render(data) {
   $("session-start").textContent = date(worker.started_at);
   amount("today", known ? data.totals.today : null);
   amount("pending", betting.pending);
-  $("policy").textContent = data.policy.predictions ? `Paper first · ${number(Math.min(data.policy.bet_max_points, data.learning?.max_stake || 50))} points max` : "Predictions off";
+  $("policy").textContent = data.policy.predictions ? "Paper only · 10 simulated points per rule" : "Prediction comparison off";
 
   $("channels").replaceChildren(...data.channels.map(channel => {
     const row = node("tr");
@@ -92,25 +92,46 @@ function render(data) {
     const first = node("td"); first.append(node("strong", event.channel_display_name || event.channel), node("span", event.title, "channel-title"));
     const state = node("td");
     const closed = ["LOCKED", "RESOLVED", "CANCELED", "CANCELLED"].includes(event.status);
-    const paper = event.learning_mode === "paper" && !event.confirmed;
-    const label = paper ? (event.trial_outcome ? "Trial: " + event.trial_outcome.toLowerCase() : "Paper trial") : event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
+    const comparison = event.paper_choices?.length && !event.confirmed;
+    const paper = comparison || (event.learning_mode === "paper" && !event.confirmed);
+    const label = comparison ? "Paper comparison" : paper ? (event.trial_outcome ? "Trial: " + event.trial_outcome.toLowerCase() : "Paper trial") : event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
     state.append(node("span", label, "badge " + (paper ? "badge-ghost" : event.result === "WIN" ? "badge-success" : event.result === "LOSE" ? "badge-error" : "badge-secondary")));
     if (event.learning_reason) state.title = event.learning_reason;
-    row.append(first, node("td", event.trial_choice || event.choice || "—"), node("td", paper ? "0 (simulated)" : event.stake ? number(event.stake) : "—"), state,
+    const picks = node("td");
+    if (comparison) {
+      for (const choice of event.paper_choices) {
+        const outcome = choice.result ? choice.result.toLowerCase() : "pending";
+        const profit = choice.profit === null ? "" : ` · ${signed(choice.profit)} pts`;
+        picks.append(node("div", `${choice.name}: ${choice.choice_title || "tie"} · ${outcome}${profit}`, "text-xs"));
+      }
+    } else picks.textContent = event.trial_choice || event.choice || "—";
+    row.append(first, picks, node("td", paper ? "0 (paper)" : event.confirmed && event.stake ? number(event.stake) : "—"), state,
       node("td", event.profit === null ? "—" : signed(event.profit), event.profit > 0 ? "positive" : event.profit < 0 ? "negative" : ""), node("td", date(event.updated_at)));
     return row;
   });
   if (!predictions.length) { const row = node("tr"); const cell = node("td", "No predictions observed yet. Bets appear when a channel starts a prediction.", "empty"); cell.colSpan = 6; row.append(cell); predictions.push(row); }
   $("predictions").replaceChildren(...predictions);
 
-  // Trials are shown separately: a simulated return must not inflate real P/L.
+  const experiment = data.experiment;
+  $("experiment-status").textContent = experiment?.events
+    ? `${number(experiment.events)} predictions observed since ${date(experiment.started_at, true)} · paper only`
+    : "Waiting for new predictions. The comparison starts fresh; earlier trials stay archived below.";
+  $("strategies").replaceChildren(...(experiment?.strategies || []).map(strategy => {
+    const row = node("tr");
+    const other = node("td", `${strategy.pending} / ${strategy.skipped}`);
+    if (strategy.cancelled || strategy.unpriced) other.append(node("small", `${strategy.cancelled} cancelled · ${strategy.unpriced} without final pools`, "channel-title"));
+    row.append(node("td", strategy.name), node("td", number(strategy.settled)),
+      node("td", `${strategy.wins} / ${strategy.losses}`),
+      node("td", strategy.profit === null ? "—" : signed(strategy.profit), strategy.profit > 0 ? "positive" : strategy.profit < 0 ? "negative" : ""),
+      node("td", strategy.roi === null ? "—" : signed(strategy.roi) + "%"), other);
+    return row;
+  }));
+
+  // Preserve the prior learner as an archive, without its old eligibility gates.
   const learningRows = (data.learning?.channels || []).map(channel => {
     const row = node("tr");
-    const explanation = node("td", channel.mode === "live" ? "Small stakes eligible" : "Paper trials");
-    explanation.append(node("small", channel.reason, "channel-title"));
-    if (channel.lower_bound !== null) explanation.append(node("small", `Last lower estimate: ${Math.round(channel.lower_bound*100)}%`, "channel-title"));
-    row.append(node("td", channel.display_name || channel.name), node("td", `${channel.trials} / ${data.learning.min_trials} minimum`),
-      node("td", `${channel.wins} / ${channel.trials}`), node("td", signed(channel.paper_profit)), explanation);
+    row.append(node("td", channel.display_name || channel.name), node("td", number(channel.trials)),
+      node("td", `${channel.wins} / ${channel.trials - channel.wins}`), node("td", signed(channel.paper_profit)));
     return row;
   });
   $("learning").replaceChildren(...learningRows);

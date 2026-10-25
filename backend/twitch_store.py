@@ -130,6 +130,18 @@ def init_database():
             );
             CREATE INDEX IF NOT EXISTS learning_channel_time
                 ON learning_trials(account,channel,created_at);
+            CREATE TABLE IF NOT EXISTS paper_events (
+                account TEXT NOT NULL, event_id TEXT NOT NULL, channel TEXT NOT NULL,
+                title TEXT NOT NULL, snapshot TEXT NOT NULL, created_at INTEGER NOT NULL,
+                resolved_at INTEGER, winner_id TEXT, cancelled INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(account,event_id)
+            );
+            CREATE INDEX IF NOT EXISTS paper_channel_time ON paper_events(account,channel,created_at);
+            CREATE TABLE IF NOT EXISTS paper_choices (
+                account TEXT NOT NULL, event_id TEXT NOT NULL, strategy TEXT NOT NULL,
+                choice_id TEXT, choice_title TEXT, result TEXT, profit INTEGER,
+                PRIMARY KEY(account,event_id,strategy)
+            );
         """)
     (data_dir() / "stats.db").chmod(0o600)
 
@@ -240,7 +252,12 @@ def dashboard():
     from twitch_learning import summary as learning_summary
     learning = learning_summary(settings["username"], settings["channels"])
     trials = {trial["event_id"]: trial for trial in learning.pop("recent", [])}
+    from twitch_experiments import summary as experiment_summary
+    experiment = experiment_summary(settings["username"], settings["channels"])
+    paper_choices = experiment.pop("recent")
     for event in predictions:
+        if event["event_id"] in paper_choices:
+            event["paper_choices"] = paper_choices[event["event_id"]]
         trial = trials.get(event["event_id"])
         if trial:
             event["learning_mode"] = trial["mode"]
@@ -249,6 +266,7 @@ def dashboard():
             event["trial_profit"] = trial["paper_profit"]
             event["trial_choice"] = trial["choice_title"]
     return {"worker": worker, "channels": ordered, "predictions": predictions, "learning": learning,
+            "experiment": experiment,
             "totals": {"balance": sum(row["balance"] or 0 for row in ordered),
                        "earned": sum(row["earned"] for row in ordered), "today": today,
                        "watched_minutes": sum(row["watched_minutes"] for row in ordered),

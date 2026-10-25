@@ -40,6 +40,9 @@ def redact(snapshot, aliases):
         if alias:
             event.update(channel=alias, channel_display_name=label(alias))
             event.pop("event_id", None)
+            for choice in event.get("paper_choices", []):
+                if choice.get("choice_title"):
+                    choice["choice_title"] = "Redacted"
             for key in ("title", "choice", "trial_choice", "learning_reason"):
                 if event.get(key):
                     event[key] = "Redacted"

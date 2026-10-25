@@ -14,16 +14,15 @@ appears alongside the other collectors in **Backend Status**. Twitch Station use
 the same DaisyUI 4 cards, spacing, buttons, theme toggle and settings drawer as the
 main dashboard. The graph and admin controls work in both light and dark themes.
 
-Predictions now start with **paper trials per channel**. The learner records a
-choice before the result, then calibrates against resolved outcomes for that
-channel, game, question, outcome label and crowd-share bucket. Real stakes require
-20 resolved recent channel trials, at least 12 matching observations, positive
-simulated returns and a conservative estimated edge. Initial stakes are 10 points;
-further evidence can raise them to 25 or 50, within a 100-point daily stake budget
-per channel. This is an experimental statistical policy, not a proven predictor.
+Predictions use a **paper-only comparison** of three fixed rules: most voters,
+most points, and least points. Each rule uses the same pre-result snapshot and
+10 hypothetical points. Twitch Station shows wins/losses, estimated P/L and ROI;
+ties and unpriced results are tracked separately. No rule automatically starts
+real betting. The previous learner and its results are preserved as an archive.
 
-Implementation: `backend/twitch_learning.py` owns the model and spending gates;
-`integrations/twitch/runner.py` connects them to Twitch; `web/twitch-summary.js`
+Implementation: `backend/twitch_experiments.py` owns the paper comparison;
+`backend/twitch_learning.py` preserves the old learner and its spending gates;
+`integrations/twitch/runner.py` connects paper observation to Twitch; `web/twitch-summary.js`
 updates the main card and Backend Status; `web/twitch/` renders the detailed view.
 Tests use temporary databases: `./venv/bin/python -m unittest discover -s tests -v`.
 

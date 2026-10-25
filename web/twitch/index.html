@@ -10,7 +10,7 @@
   <link rel="icon" href="/web/static/favicon.ico">
   <!-- Keep these content versions in sync when CSS/JS changes; see the integration guide. -->
   <link rel="stylesheet" href="/twitch/style.css?v=d2f577b67183">
-  <script src="/twitch/script.js?v=db526b5b273a" defer></script>
+  <script src="/twitch/script.js?v=549193c06e03" defer></script>
 </head>
 <body>
   <div class="drawer drawer-end">
@@ -35,8 +35,8 @@
               <div class="grid grid-cols-2 gap-4 mt-2">
                 <div><span class="text-base-content/60">Channel balances</span><div id="total-balance" class="text-xl font-bold">--</div><small id="channel-count">Waiting for channels</small></div>
                 <div><span class="text-base-content/60">Tracked change</span><div id="total-net" class="text-xl font-bold">--</div><small>Since tracking began</small></div>
-                <div><span class="text-base-content/60">Prediction P/L</span><div id="bet-profit" class="text-xl font-bold">--</div><small id="bet-count">No confirmed bets yet</small></div>
-                <div><span class="text-base-content/60">Win rate</span><div id="win-rate" class="text-xl font-bold">--</div><small id="win-count">No results yet</small></div>
+                <div><span class="text-base-content/60">Real prediction P/L</span><div id="bet-profit" class="text-xl font-bold">--</div><small id="bet-count">No confirmed bets yet</small></div>
+                <div><span class="text-base-content/60">Real win rate</span><div id="win-rate" class="text-xl font-bold">--</div><small id="win-count">No results yet</small></div>
               </div>
             </div>
           </section>
@@ -70,22 +70,27 @@
           <section class="card bg-base-200 shadow-xl">
             <div class="card-body">
               <h2 class="card-title">Session</h2>
-              <dl class="session-details"><div><dt>Started</dt><dd id="session-start">--</dd></div><div><dt>Increases today</dt><dd id="today">--</dd></div><div><dt>Pending bets</dt><dd id="pending">--</dd></div><div><dt>Bet limits</dt><dd id="policy">--</dd></div></dl>
+              <dl class="session-details"><div><dt>Started</dt><dd id="session-start">--</dd></div><div><dt>Increases today</dt><dd id="today">--</dd></div><div><dt>Pending bets</dt><dd id="pending">--</dd></div><div><dt>Prediction mode</dt><dd id="policy">--</dd></div></dl>
               <p class="text-sm text-base-content/60">Tracked change includes bets. Balance increases can include payouts and refunds; prediction P/L subtracts the stake.</p>
             </div>
           </section>
           <section class="card bg-base-200 shadow-xl full-card">
             <div class="card-body">
-              <h2 class="card-title">Channel Learning</h2>
-              <p class="text-sm text-base-content/60">Each channel starts with simulated bets. Small real stakes require enough resolved trials and a conservative estimated edge.</p>
-              <div class="overflow-x-auto"><table class="table"><thead><tr><th>Channel</th><th>Resolved trials</th><th>Trial wins</th><th>Simulated P/L</th><th>Mode / last decision</th></tr></thead><tbody id="learning"><tr><td colspan="5">Waiting for learning data.</td></tr></tbody></table></div>
+              <h2 class="card-title">Paper Strategy Comparison <span class="badge badge-ghost">No real bets</span></h2>
+              <p id="experiment-status" class="text-sm text-base-content/60">Waiting for new predictions.</p>
+              <div class="overflow-x-auto"><table class="table"><thead><tr><th>Rule</th><th>Settled</th><th>Wins / losses</th><th>Simulated P/L</th><th>ROI</th><th>Pending / skipped</th></tr></thead><tbody id="strategies"><tr><td colspan="6">Waiting for comparison data.</td></tr></tbody></table></div>
+              <p class="text-sm text-base-content/60">All three rules use the same opening snapshot and 10 simulated points each. Least points picks the smaller points pool. Ties are skipped. Missing final pools are excluded from P/L and ROI for all rules on that prediction. Returns are estimates; no rule automatically starts real betting.</p>
+              <details><summary class="cursor-pointer text-sm mt-2">Previous learner (archived)</summary>
+                <p class="text-sm text-base-content/60 mt-2">These earlier trials are preserved separately and do not count toward the new comparison.</p>
+                <div class="overflow-x-auto"><table class="table"><thead><tr><th>Channel</th><th>Settled trials</th><th>Wins / losses</th><th>Simulated P/L</th></tr></thead><tbody id="learning"><tr><td colspan="4">No archived trials.</td></tr></tbody></table></div>
+              </details>
             </div>
           </section>
           <section class="card bg-base-200 shadow-xl full-card">
             <div class="card-body">
               <h2 class="card-title">Predictions &amp; Results</h2>
-              <div class="overflow-x-auto"><table class="table"><thead><tr><th>Channel / prediction</th><th>Bot's pick</th><th>Stake</th><th>State</th><th>Profit / loss</th><th>Updated</th></tr></thead><tbody id="predictions"><tr><td colspan="6">No predictions observed yet.</td></tr></tbody></table></div>
-              <p class="text-sm text-base-content/60">Simulations spend no points. Considering an outcome is separate from a bet confirmed by Twitch. Latest 100 events.</p>
+              <div class="overflow-x-auto"><table class="table"><thead><tr><th>Channel / prediction</th><th>Picks / paper results</th><th>Real stake</th><th>State</th><th>Real profit / loss</th><th>Updated</th></tr></thead><tbody id="predictions"><tr><td colspan="6">No predictions observed yet.</td></tr></tbody></table></div>
+              <p class="text-sm text-base-content/60">New predictions show each rule's simulated result under its pick. Simulations spend no points and never enter real P/L. Latest 100 events.</p>
             </div>
           </section>
           <section id="settings-panel" class="card bg-base-200 shadow-xl full-card" hidden>
@@ -94,10 +99,10 @@
               <div id="activation" class="alert" hidden><div><strong>Connect Twitch</strong><p id="auth-message"></p><a id="activate-link" class="btn btn-primary mt-2" href="https://www.twitch.tv/activate" target="_blank" rel="noopener noreferrer">Open Twitch activation</a></div><div><code id="auth-code" class="text-xl font-bold"></code><p id="auth-expires" class="text-sm"></p></div></div>
               <form id="settings-form">
                 <div class="settings-fields"><label class="form-control">Twitch username<input id="username" name="username" class="input input-bordered" autocomplete="off" required maxlength="25"></label><label class="form-control channels-field">Channels, one per line<textarea id="channel-list" class="textarea textarea-bordered" rows="4" required spellcheck="false"></textarea></label></div>
-                <label class="flex items-center gap-2 my-4"><input id="enable-predictions" class="checkbox checkbox-primary" type="checkbox"> Learn predictions and allow confidence-gated bets</label>
+                <label class="flex items-center gap-2 my-4"><input id="enable-predictions" class="checkbox checkbox-primary" type="checkbox"> Compare prediction strategies (paper only)</label>
                 <div class="settings-fields"><label class="form-control">Balance percentage cap<input id="bet-percentage" class="input input-bordered" type="number" min="1" max="10" required></label><label class="form-control">Maximum points per bet<input id="bet-max" class="input input-bordered" type="number" min="10" max="10000" required></label><label class="form-control">Minimum balance to bet<input id="bet-min" class="input input-bordered" type="number" min="1000" max="10000000" required></label></div>
                 <div class="flex flex-wrap items-center gap-2 mt-4"><button class="btn btn-primary" type="submit">Save &amp; apply</button><span id="settings-message" class="text-sm" role="status"></span></div>
-                <p class="text-sm text-base-content/60 mt-2">The learner also enforces a 50-point stake ceiling and 100-point daily stake budget per channel. Changing settings restarts the miner.</p>
+                <p class="text-sm text-base-content/60 mt-2">Real-bet limits are saved but inactive. This experiment never submits a real wager, regardless of these values. Changing settings restarts the miner.</p>
               </form>
             </div>
           </section>
