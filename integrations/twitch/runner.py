@@ -17,6 +17,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 import twitch_store as store
 import twitch_learning as learning
+import twitch_experiments as experiments
 from auth import credentials
 from prediction_timing import EarlyPredictions, prediction_open
 
@@ -175,32 +176,19 @@ def main():
 
         Twitch.login = login
 
-        original_prediction = Twitch.make_predictions
-
-        def learned_prediction(twitch, event):
-            """Every scheduled prediction passes the durable paper/live gate.
-
-            Failures NEVER fall back to upstream SMART betting. The per-event
-            settings copy avoids one channel's stake leaking into another timer.
-            """
+        def paper_prediction(twitch, event):
+            """The active experiment has no path to upstream's real submitter."""
             if STOP.is_set() or not prediction_open(event):
                 return
             try:
-                def submit_if_open(selected):
-                    # SQLite comparison/reservation can outlast a short window.
-                    if not STOP.is_set() and prediction_open(selected):
-                        original_prediction(twitch, selected)
-
-                plan = learning.execute(event, settings,
-                    submit_if_open,
-                    Strategy.NUMBER_1, Strategy.NUMBER_2)
-                if plan and plan["mode"] != "live":
-                    log.info("Paper trial for %s: %s", event.streamer.username, plan["reason"])
+                plan = experiments.execute(event, settings)
+                if plan:
+                    log.info("Paper comparison for %s: %s", event.streamer.username, plan["reason"])
                 store.record_prediction(settings["username"], prediction_snapshot(event))
             except (ValueError, KeyError, TypeError, StopIteration, sqlite3.Error, OSError):
-                log.warning("Learning gate could not evaluate %s; no wager submitted.", event.streamer.username)
+                log.warning("Paper comparison waiting for usable market data on %s.", event.streamer.username)
 
-        early_predictions = EarlyPredictions(learned_prediction, STOP)
+        early_predictions = EarlyPredictions(paper_prediction, STOP)
 
         def schedule_prediction(twitch, event):
             return early_predictions.schedule(twitch, event)
@@ -222,6 +210,7 @@ def main():
                     # predictions-user-v1, they arrive even when we spend zero.
                     event_data = event_message["data"]["event"]
                     learning.resolve_event(settings["username"], event_data)
+                    experiments.resolve_event(settings["username"], event_data)
                     event = websocket.events_predictions.get(event_data["id"])
                     if event is not None and event_data["status"] == "ACTIVE":
                         # Creation may have an empty pool. Every active update
@@ -255,8 +244,8 @@ def main():
                 community_goals=False, chat=ChatPresence.NEVER,
                 bet=BetSettings(strategy=Strategy.SMART, percentage=settings["bet_percentage"],
                     max_points=min(settings["bet_max_points"], learning.MAX_STAKE),
-                    # Observe paper trials even at zero balance. The learning
-                    # gate above enforces the user's reserve before REAL stakes.
+                    # Observe paper comparisons even at zero balance. The active
+                    # callback has no submitter and always sets the stake to zero.
                     minimum_points=-1,
                     # Preserve the actual closing deadline: FROM_START + zero
                     # causes upstream to reject events as already expired.

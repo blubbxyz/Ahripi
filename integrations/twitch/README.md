@@ -106,49 +106,45 @@ SQLite without write permissions. No public route starts a miner or changes sett
 
 The local `AHRIPI_HELPER.md` is also explicitly ignored by Git.
 
-## Learning and prediction defaults
+## Paper strategy comparison
 
-Automatic prediction observation is enabled, but **new channels spend zero points
-until they pass the paper-trial gates**. The old unconditional SMART strategy has
-been replaced by `backend/twitch_learning.py`; upstream only submits a selected
-outcome after that module authorizes a bounded real stake.
+The active prediction worker **never submits real wagers**. It compares three
+fixed rules on the same pre-result two-outcome market:
 
-- Record both outcomes and pool/voter counts as soon as usable market data arrives. Entry
-  snapshots are immutable and keyed by account + event ID.
-- Resolve trials only from an explicit Twitch winner or cancellation. A cancelled
-  or unresolved event never becomes a training win. Missing outcome data stays
-  unresolved; it cannot promote the model to real betting.
-- Learn separately for each account/channel/game/normalized question/outcome
-  label/crowd-share bucket. Numbers in questions are preserved: 10 kills and 30
-  kills are different propositions. No training is imported from other channels.
-- Consider at most the last 100 resolved trials in the last 90 days. Need at least
-  **20 channel trials** and **12 matching outcome observations** before real stakes.
-- Use the Wilson lower bound with z=1.96, rather than raw win rate, as the
-  conservative win estimate. Require an estimated edge of at least **8%** after
-  adding our proposed stake to the pool, plus positive recent simulated P/L.
-- Initially allow **10-point** stakes. At 50 matching observations and 15% estimated
-  edge, allow up to 25; at 100 matches and 25% edge, up to 50. Recheck value after
-  stake dilution. Every gate must still pass on every prediction.
-- Enforce the user's percentage/stake limits AND a **0.5% balance cap**, a hard
-  **50-point ceiling**, and the configured **1,000-point remaining reserve**.
-- Require at least 20 participants for a real stake. Currently only two-outcome
-  predictions are supported; missing/unsupported data means no wager.
-- Reserve at most **100 points of submitted stakes per channel per Berlin day**.
-  Reservations count even for rejected/unconfirmed requests; this is not a net
-  loss budget. Allow at most one unresolved live reservation per channel.
-- After three consecutive confirmed losses, use paper trials for a **24-hour
-  cooldown**. Failures never fall back to an unrestricted upstream strategy.
-- Use a 10-point hypothetical stake to estimate paper P/L from final pools.
-  Missing final pools leave the paper return unknown. Simulated money never
-  increments confirmed bets, real P/L, balances or actual win-rate counters.
+| Rule | Choice |
+| --- | --- |
+| Most voters | Outcome with more participants |
+| Most points | Outcome with the larger points pool |
+| Least points | Outcome with the smaller points pool |
 
-This is transparent online calibration, not an AI that understands the stream or
-a tested guarantee of profit. Sparse matching data can keep a channel in paper
-mode indefinitely. The Wilson calculation assumes a binomial sample; changing
-audiences, related questions, pool movement after entry, and selection effects
-mean its bound is not a guarantee of future performance. See the
-[NIST confidence-interval reference](https://itl.nist.gov/div898/handbook/prc/section2/prc241.htm).
-The UI calls it a “lower estimate” and shows trial counts and skip reasons.
+Each rule uses **10 simulated points** independently. Ties are skipped for that
+rule. Opening pools with no participants/points wait for an active update. Entry
+snapshots and all three choices are saved atomically and remain immutable across
+duplicate messages and restarts. Only explicit winners or cancellations settle
+them; missing winners remain pending. No question matching, training threshold
+or automatic promotion is involved.
+
+Estimated profit uses final pools, including the hypothetical stake's dilution.
+If final pools are absent or inconsistent, the entire market is excluded from
+every rule's P/L and ROI, even though a known winner still records wins/losses.
+Cancelled predictions and ties are excluded from ROI. ROI is simulated profit
+divided by the 10-point stakes on priced, settled predictions for that rule.
+Pending, skipped, cancelled and unpriced counts remain visible. These estimates
+do not account for other viewers reacting to a real bet.
+
+The comparison starts with newly observed predictions. Earlier learner results
+remain in `learning_trials` and the page's **Previous learner (archived)** section;
+they are not replayed into the new experiment. Existing pending legacy trials
+can still settle from explicit result messages. Historical real wagers/results
+also remain intact. No database rows are cleared or rewritten to simulate gains.
+
+The runner's active callback invokes `twitch_experiments.execute`, which has no
+submission callback and always sets an actual stake of zero. No balance, confirmed
+bet counter, actual win rate or real P/L is increased by simulated returns.
+The old learner and its reserve/percentage/50-point stake/100-point daily budget
+and cooldown checks remain in `twitch_learning.py`, but are inactive. Enabling any
+real betting requires a separate explicit implementation decision, not enough
+paper wins or changing the saved limits.
 
 ### Worker settings
 
@@ -160,15 +156,13 @@ The UI calls it a “lower estimate” and shows trial counts and skip reasons.
   `FROM_START` with zero delay makes upstream discard new events as expired.
   Message-driven evaluation runs immediately; the old deadline timer is guarded
   against expired/decided events. Duplicate updates cannot submit concurrent bets.
-  Confidence, participant minimums, reserves and stake budgets still apply; no
-  artificial wait does not guarantee Twitch accepts a bet before an early lock.
+  The active callback records paper choices only; it cannot submit real bets.
 - Community-goal contributions, drops, and chat participation disabled.
 - TLS certificate verification remains enabled.
 
-Admins can lower the stake limits on the page. The existing config schema accepts
-1–10% and 10–10,000 points per bet for compatibility, but **cannot bypass the
-learner's stricter ceilings or paper gates**. The default stake cap is now 50.
-Turning predictions off also stops new trials; mining continues.
+Saved real-bet limits remain in the admin settings for compatibility and do not
+enable real betting. Turning prediction comparison off stops new paper entries;
+mining continues and previously recorded comparisons can still settle.
 Changing settings restarts the worker;
 saved statistics survive. The settings form requires the admin session and a
 same-origin request header.
@@ -253,10 +247,10 @@ They cover auth boundaries, public-response secret filtering, settings validatio
 baseline/gain tracking, prediction confirmation/results, persistence across database
 reinitialization, and bounded history. Live point earning depends on Twitch, a
 stream being live, and the upstream miner; the UI marks stale data rather than
-inventing activity. `tests/test_twitch_learning.py` adds chronological simulated
-streams covering zero-spend warm-up, channel/context isolation, immutable labels,
-future/stale-result exclusion, pool pricing, reserves/budgets, loss cooldowns,
-restart idempotency, and the adapter that blocks submission during paper mode.
+inventing activity. `tests/test_twitch_experiments.py` covers shared snapshots,
+fixed picks, ties, payouts/ROI, missing pools/winners, duplicate messages, account
+isolation, archived data and the lack of automatic real betting. Existing
+`tests/test_twitch_learning.py` preserves the old learner's safety checks.
 
 Browser verification covers the main badge location, matching computed card
 styles, dark/light charts, small-screen layout and real admin login/logout.
@@ -264,21 +258,21 @@ styles, dark/light charts, small-screen layout and real admin login/logout.
 ## Code map and model persistence
 
 - `backend/twitch_store.py`: additive SQLite schema, public snapshot and histories.
-- `backend/twitch_learning.py`: model, policy, atomic stake reservations, result
-  settlement and public explanation. No network calls or vendor imports.
-- `integrations/twitch/runner.py`: the fail-closed adapter replaces
-  `Twitch.make_predictions`; a per-event settings copy selects the learned outcome.
-  The channel-prediction websocket observes results even for paper trials, while
-  user-prediction messages confirm and settle real bets.
+- `backend/twitch_experiments.py`: active fixed paper rules and ROI comparison.
+- `backend/twitch_learning.py`: archived model, spending gates and old settlements.
+- `integrations/twitch/runner.py`: replaces `Twitch.make_predictions` with a
+  paper-only callback. Channel messages settle paper comparisons and old trials;
+  user messages can still confirm/settle historical real wagers.
+- `paper_events` and `paper_choices`: additive experiment tables in the private
+  `stats.db`. One shared snapshot per event, one result per rule. No retroactive
+  history import and no real stake reservations.
 - `learning_trials` in the existing private `stats.db`: pre-result pool snapshot,
   selected outcome, context, paper/live reason, reserved stake and explicit result.
   Its primary key prevents duplicate evaluation/spending after restart. Account
   and channel indexes preserve isolation. No existing history tables are removed.
 
 If the worker misses a result while offline and Twitch does not replay it, that
-trial stays unresolved rather than inventing a label. An unresolved real
-reservation blocks another real bet on that channel. Inspect the trial/history
-before changing state; never delete runtime data to “improve” model confidence.
+comparison stays pending. Never guess winners or delete rows to improve results.
 
 ## Deployment scope
 

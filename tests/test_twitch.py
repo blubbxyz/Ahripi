@@ -267,6 +267,22 @@ class TwitchTests(unittest.TestCase):
         self.login()
         self.assertEqual(self.client.get("/api/twitch").status_code, 200)
 
+    def test_paper_comparison_choices_respect_visitor_redactions(self):
+        import twitch_experiments as paper
+        names = self.redacted_channels()
+        outcomes = [{"id": "yes", "title": "Identifying paper choice", "total_users": 70, "total_points": 40},
+                    {"id": "no", "title": "Other identifying choice", "total_users": 30, "total_points": 60}]
+        paper.record("test_viewer", names[0] + "_event", names[0], "Private question", outcomes)
+        response = self.client.get("/api/twitch")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("Identifying paper choice", response.text)
+        self.assertNotIn("Other identifying choice", response.text)
+        self.assertTrue(all(name not in response.text for name in names))
+        self.assertEqual(response.json["experiment"]["events"], 1)
+        self.login()
+        response = self.client.get("/api/twitch")
+        self.assertIn("Identifying paper choice", response.text)
+
 
 if __name__ == "__main__":
     unittest.main()
