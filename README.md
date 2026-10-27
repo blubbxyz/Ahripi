@@ -17,10 +17,13 @@ main dashboard. The graph and admin controls work in both light and dark themes.
 Predictions use a **paper-only comparison** of three fixed rules: most voters,
 most points, and least points. Each rule uses the same pre-result snapshot and
 10 hypothetical points. Twitch Station shows wins/losses, estimated P/L and ROI;
-ties and unpriced results are tracked separately. No rule automatically starts
-real betting. The previous learner and its results are preserved as an archive.
+ties and unpriced results are tracked separately. Paper results never automatically
+enable real betting. An explicitly enabled live pilot can use one fixed rule on
+selected channels: 10 points per attempt, a 100-point daily channel budget,
+the saved reserve and a 0.5% balance cap. The previous learner remains archived.
 
 Implementation: `backend/twitch_experiments.py` owns the paper comparison;
+`backend/twitch_betting.py` owns the optional bounded live pilot;
 `backend/twitch_learning.py` preserves the old learner and its spending gates;
 `integrations/twitch/runner.py` connects paper observation to Twitch; `web/twitch-summary.js`
 updates the main card and Backend Status; `web/twitch/` renders the detailed view.

@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULTS = {
     "username": "", "channels": [], "predictions": True,
     "bet_percentage": 1, "bet_max_points": 50, "bet_min_balance": 1000,
+    "live_betting": False, "bet_strategy": "most_voters", "bet_channels": [],
 }
 NAME = re.compile(r"^[a-z0-9_]{1,25}$")
 
@@ -63,8 +64,17 @@ def validate_config(value):
         if name not in cleaned:
             cleaned.append(name)
     config["channels"] = cleaned
-    if type(config["predictions"]) is not bool:
-        raise ValueError("Predictions must be enabled or disabled.")
+    if any(type(config[key]) is not bool for key in ("predictions", "live_betting")):
+        raise ValueError("Prediction and live-betting switches must be enabled or disabled.")
+    if config["bet_strategy"] not in ("most_voters", "most_points", "least_points"):
+        raise ValueError("Choose a listed betting rule.")
+    if not isinstance(config["bet_channels"], list) or any(
+        not isinstance(name, str) or name not in cleaned for name in config["bet_channels"]
+    ):
+        raise ValueError("Live-betting channels must be in the tracked channel list.")
+    config["bet_channels"] = list(dict.fromkeys(config["bet_channels"]))
+    if config["live_betting"] and not config["bet_channels"]:
+        raise ValueError("Choose at least one live-betting channel.")
     for key, low, high in [("bet_percentage", 1, 10), ("bet_max_points", 10, 10000),
                            ("bet_min_balance", 1000, 10000000)]:
         if type(config[key]) is not int or not low <= config[key] <= high:
@@ -142,6 +152,14 @@ def init_database():
                 choice_id TEXT, choice_title TEXT, result TEXT, profit INTEGER,
                 PRIMARY KEY(account,event_id,strategy)
             );
+            CREATE TABLE IF NOT EXISTS bet_decisions (
+                account TEXT NOT NULL, event_id TEXT NOT NULL, channel TEXT NOT NULL,
+                strategy TEXT NOT NULL, choice_id TEXT, choice_title TEXT,
+                mode TEXT NOT NULL, reason TEXT NOT NULL, stake INTEGER NOT NULL,
+                created_at INTEGER NOT NULL, closed_at INTEGER,
+                PRIMARY KEY(account,event_id)
+            );
+            CREATE INDEX IF NOT EXISTS bet_channel_time ON bet_decisions(account,channel,created_at);
         """)
     (data_dir() / "stats.db").chmod(0o600)
 
@@ -177,8 +195,12 @@ def record_prediction(account, event, at=None):
                                     result,profit,first_seen,updated_at)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(account,event_id) DO UPDATE SET
-                status=excluded.status,choice=excluded.choice,stake=excluded.stake,
-                confirmed=excluded.confirmed,result=excluded.result,profit=excluded.profit,
+                status=CASE WHEN predictions.result IS NOT NULL THEN predictions.status ELSE excluded.status END,
+                choice=CASE WHEN excluded.stake>predictions.stake THEN excluded.choice ELSE COALESCE(predictions.choice,excluded.choice) END,
+                stake=MAX(predictions.stake,excluded.stake),
+                confirmed=MAX(predictions.confirmed,excluded.confirmed),
+                result=COALESCE(excluded.result,predictions.result),
+                profit=COALESCE(excluded.profit,predictions.profit),
                 updated_at=excluded.updated_at
         """, (account, event["id"], event["channel"], event["title"], event["status"],
               event.get("choice"), event.get("stake", 0), bool(event.get("confirmed")),
@@ -255,7 +277,12 @@ def dashboard():
     from twitch_experiments import summary as experiment_summary
     experiment = experiment_summary(settings["username"], settings["channels"])
     paper_choices = experiment.pop("recent")
+    from twitch_betting import summary as betting_summary
+    live_betting = betting_summary(settings)
+    live_decisions = live_betting.pop("recent")
     for event in predictions:
+        if event["event_id"] in live_decisions:
+            event["bet_decision"] = live_decisions[event["event_id"]]
         if event["event_id"] in paper_choices:
             event["paper_choices"] = paper_choices[event["event_id"]]
         trial = trials.get(event["event_id"])
@@ -267,11 +294,12 @@ def dashboard():
             event["trial_choice"] = trial["choice_title"]
     return {"worker": worker, "channels": ordered, "predictions": predictions, "learning": learning,
             "experiment": experiment,
+            "live_betting": live_betting,
             "totals": {"balance": sum(row["balance"] or 0 for row in ordered),
                        "earned": sum(row["earned"] for row in ordered), "today": today,
                        "watched_minutes": sum(row["watched_minutes"] for row in ordered),
                        "betting": betting},
-            "policy": {k: settings[k] for k in ("predictions", "bet_percentage", "bet_max_points", "bet_min_balance")}}
+            "policy": {k: settings[k] for k in ("predictions", "bet_percentage", "bet_max_points", "bet_min_balance", "live_betting", "bet_strategy", "bet_channels")}}
 
 
 def history(channel, hours=24):

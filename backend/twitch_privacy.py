@@ -51,6 +51,10 @@ def redact(snapshot, aliases):
         if alias:
             channel.update(name=alias, display_name=label(alias),
                            reason="Details hidden for visitors.")
+    snapshot["policy"]["bet_channels"] = [aliases.get(name, name) for name in snapshot["policy"].get("bet_channels", [])]
+    for channel in snapshot.get("live_betting", {}).get("channels", []):
+        if channel["name"] in aliases:
+            channel["name"] = aliases[channel["name"]]
 
     # Worker messages and other channels' free text can also mention a name.
     pattern = re.compile("|".join(re.escape(name) for name in sorted(aliases, key=len, reverse=True)), re.I)

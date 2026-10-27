@@ -283,6 +283,16 @@ class TwitchTests(unittest.TestCase):
         response = self.client.get("/api/twitch")
         self.assertIn("Identifying paper choice", response.text)
 
+    def test_live_policy_keeps_redacted_channel_names_private(self):
+        names = self.redacted_channels()
+        settings = store.validate_config({**self.settings, "live_betting": True, "bet_channels": [names[0]]})
+        store.write_json("config.json", settings)
+        response = self.client.get("/api/twitch")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(names[0], response.text)
+        self.assertEqual(response.json["policy"]["bet_channels"], ["redacted-channel-1"])
+        self.assertEqual(response.json["live_betting"]["channels"][0]["name"], "redacted-channel-1")
+
 
 if __name__ == "__main__":
     unittest.main()

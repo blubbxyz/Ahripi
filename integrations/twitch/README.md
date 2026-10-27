@@ -108,8 +108,9 @@ The local `AHRIPI_HELPER.md` is also explicitly ignored by Git.
 
 ## Paper strategy comparison
 
-The active prediction worker **never submits real wagers**. It compares three
-fixed rules on the same pre-result two-outcome market:
+The worker always compares three fixed paper rules on the same pre-result
+two-outcome market. Real betting is **off by default** and requires explicitly
+enabling a separate bounded pilot on selected channels:
 
 | Rule | Choice |
 | --- | --- |
@@ -138,13 +139,40 @@ they are not replayed into the new experiment. Existing pending legacy trials
 can still settle from explicit result messages. Historical real wagers/results
 also remain intact. No database rows are cleared or rewritten to simulate gains.
 
-The runner's active callback invokes `twitch_experiments.execute`, which has no
-submission callback and always sets an actual stake of zero. No balance, confirmed
-bet counter, actual win rate or real P/L is increased by simulated returns.
+The paper comparison itself never submits bets. No balance, confirmed bet
+counter, actual win rate or real P/L is increased by simulated returns.
 The old learner and its reserve/percentage/50-point stake/100-point daily budget
 and cooldown checks remain in `twitch_learning.py`, but are inactive. Enabling any
-real betting requires a separate explicit implementation decision, not enough
-paper wins or changing the saved limits.
+real betting requires the explicit pilot switch and channel selection, not enough
+paper wins or simply raising the saved limits.
+
+### Optional small live pilot
+
+The operator controls `live_betting` (default false), `bet_strategy`, and
+`bet_channels` through admin-only settings. The strategy is one of the same three
+rules. Channels must be explicitly selected from the tracked list; all others
+stay paper-only. There is no training-count gate or automatic strategy switch.
+
+`twitch_betting.py` atomically records one decision per account/event before any
+submission. Live stakes are fixed at **10 points**, never increased by winning
+streaks. Existing maximum/percentage settings can only constrain that further.
+Keep at least the saved reserve (minimum 1,000), and never exceed 0.5% of balance.
+Reserve no more than **100 points per channel per Berlin day**, including failed
+or unconfirmed attempts. Allow at most one unresolved real attempt per channel.
+Three consecutive confirmed losses pause live betting for 24 hours. Ties,
+missing market data, disabled predictions and closed windows never submit bets.
+
+The durable `bet_decisions` primary key prevents retries on duplicate messages or
+restarts. Replayed events recover their stored stake without resubmitting. Late
+snapshots cannot erase confirmed stakes or results. Only Twitch confirmation
+increments actual bets; net real P/L subtracts the submitted stake. Explicit
+channel or user result messages release pending reservations. Missed results can
+leave a reservation pending; inspect it rather than deleting it to force retries.
+
+Paper comparison continues on all tracked channels. The page separates simulated
+rule results, reserved/unconfirmed live attempts and confirmed actual wagers.
+The live-policy line displays the chosen rule, channels, daily reservations and
+pending attempts. Turning off live betting keeps paper comparisons running.
 
 ### Worker settings
 
@@ -156,13 +184,14 @@ paper wins or changing the saved limits.
   `FROM_START` with zero delay makes upstream discard new events as expired.
   Message-driven evaluation runs immediately; the old deadline timer is guarded
   against expired/decided events. Duplicate updates cannot submit concurrent bets.
-  The active callback records paper choices only; it cannot submit real bets.
+  The callback records paper choices and submits only a newly reserved eligible
+  live pilot decision, when explicitly enabled.
 - Community-goal contributions, drops, and chat participation disabled.
 - TLS certificate verification remains enabled.
 
-Saved real-bet limits remain in the admin settings for compatibility and do not
-enable real betting. Turning prediction comparison off stops new paper entries;
-mining continues and previously recorded comparisons can still settle.
+Saved stake limits do not enable real betting by themselves. Turning predictions
+off stops new paper entries and live submissions; mining continues and recorded
+comparisons can still settle. The separate live switch leaves paper observation on.
 Changing settings restarts the worker;
 saved statistics survive. The settings form requires the admin session and a
 same-origin request header.
@@ -260,12 +289,15 @@ styles, dark/light charts, small-screen layout and real admin login/logout.
 - `backend/twitch_store.py`: additive SQLite schema, public snapshot and histories.
 - `backend/twitch_experiments.py`: active fixed paper rules and ROI comparison.
 - `backend/twitch_learning.py`: archived model, spending gates and old settlements.
-- `integrations/twitch/runner.py`: replaces `Twitch.make_predictions` with a
-  paper-only callback. Channel messages settle paper comparisons and old trials;
+- `backend/twitch_betting.py`: optional fixed-rule live pilot and atomic limits.
+- `integrations/twitch/runner.py`: replaces `Twitch.make_predictions` with the
+  paper/live coordinator. Channel messages settle comparisons and old trials;
   user messages can still confirm/settle historical real wagers.
 - `paper_events` and `paper_choices`: additive experiment tables in the private
   `stats.db`. One shared snapshot per event, one result per rule. No retroactive
   history import and no real stake reservations.
+- `bet_decisions`: optional live reservations and explicit skip reasons, separate
+  from paper scores and the archived learner. No automatic promotion.
 - `learning_trials` in the existing private `stats.db`: pre-result pool snapshot,
   selected outcome, context, paper/live reason, reserved stake and explicit result.
   Its primary key prevents duplicate evaluation/spending after restart. Account
