@@ -10,7 +10,7 @@
   <link rel="icon" href="/web/static/favicon.ico">
   <!-- Keep these content versions in sync when CSS/JS changes; see the integration guide. -->
   <link rel="stylesheet" href="/twitch/style.css?v=d2f577b67183">
-  <script src="/twitch/script.js?v=549193c06e03" defer></script>
+  <script src="/twitch/script.js?v=3e61661e71f1" defer></script>
 </head>
 <body>
   <div class="drawer drawer-end">
@@ -76,10 +76,11 @@
           </section>
           <section class="card bg-base-200 shadow-xl full-card">
             <div class="card-body">
-              <h2 class="card-title">Paper Strategy Comparison <span class="badge badge-ghost">No real bets</span></h2>
+              <h2 class="card-title">Paper Strategy Comparison <span class="badge badge-ghost">Simulated</span></h2>
+              <p id="live-policy" class="text-sm">Real betting is off.</p>
               <p id="experiment-status" class="text-sm text-base-content/60">Waiting for new predictions.</p>
               <div class="overflow-x-auto"><table class="table"><thead><tr><th>Rule</th><th>Settled</th><th>Wins / losses</th><th>Simulated P/L</th><th>ROI</th><th>Pending / skipped</th></tr></thead><tbody id="strategies"><tr><td colspan="6">Waiting for comparison data.</td></tr></tbody></table></div>
-              <p class="text-sm text-base-content/60">All three rules use the same opening snapshot and 10 simulated points each. Least points picks the smaller points pool. Ties are skipped. Missing final pools are excluded from P/L and ROI for all rules on that prediction. Returns are estimates; no rule automatically starts real betting.</p>
+              <p class="text-sm text-base-content/60">All three rules use the same opening snapshot and 10 simulated points each. Least points picks the smaller points pool. Ties are skipped. Missing final pools are excluded from P/L and ROI for all rules on that prediction. Returns are estimates; paper results never enable real betting automatically.</p>
               <details><summary class="cursor-pointer text-sm mt-2">Previous learner (archived)</summary>
                 <p class="text-sm text-base-content/60 mt-2">These earlier trials are preserved separately and do not count toward the new comparison.</p>
                 <div class="overflow-x-auto"><table class="table"><thead><tr><th>Channel</th><th>Settled trials</th><th>Wins / losses</th><th>Simulated P/L</th></tr></thead><tbody id="learning"><tr><td colspan="4">No archived trials.</td></tr></tbody></table></div>
@@ -99,10 +100,12 @@
               <div id="activation" class="alert" hidden><div><strong>Connect Twitch</strong><p id="auth-message"></p><a id="activate-link" class="btn btn-primary mt-2" href="https://www.twitch.tv/activate" target="_blank" rel="noopener noreferrer">Open Twitch activation</a></div><div><code id="auth-code" class="text-xl font-bold"></code><p id="auth-expires" class="text-sm"></p></div></div>
               <form id="settings-form">
                 <div class="settings-fields"><label class="form-control">Twitch username<input id="username" name="username" class="input input-bordered" autocomplete="off" required maxlength="25"></label><label class="form-control channels-field">Channels, one per line<textarea id="channel-list" class="textarea textarea-bordered" rows="4" required spellcheck="false"></textarea></label></div>
-                <label class="flex items-center gap-2 my-4"><input id="enable-predictions" class="checkbox checkbox-primary" type="checkbox"> Compare prediction strategies (paper only)</label>
+                <label class="flex items-center gap-2 my-4"><input id="enable-predictions" class="checkbox checkbox-primary" type="checkbox"> Observe predictions and compare paper strategies</label>
+                <label class="flex items-center gap-2 my-4"><input id="enable-live-betting" class="checkbox checkbox-primary" type="checkbox"> Enable limited real betting on selected channels</label>
+                <div class="settings-fields"><label class="form-control">Live rule<select id="bet-strategy" class="select select-bordered"><option value="most_voters">Most voters</option><option value="most_points">Most points</option><option value="least_points">Least points</option></select></label><label class="form-control">Live channels, one name per line<textarea id="live-channels" class="textarea textarea-bordered" rows="2" spellcheck="false"></textarea></label></div>
                 <div class="settings-fields"><label class="form-control">Balance percentage cap<input id="bet-percentage" class="input input-bordered" type="number" min="1" max="10" required></label><label class="form-control">Maximum points per bet<input id="bet-max" class="input input-bordered" type="number" min="10" max="10000" required></label><label class="form-control">Minimum balance to bet<input id="bet-min" class="input input-bordered" type="number" min="1000" max="10000000" required></label></div>
                 <div class="flex flex-wrap items-center gap-2 mt-4"><button class="btn btn-primary" type="submit">Save &amp; apply</button><span id="settings-message" class="text-sm" role="status"></span></div>
-                <p class="text-sm text-base-content/60 mt-2">Real-bet limits are saved but inactive. This experiment never submits a real wager, regardless of these values. Changing settings restarts the miner.</p>
+                <p class="text-sm text-base-content/60 mt-2">Live stakes are fixed at 10 points, capped at 100 reserved points per channel per Berlin day. The reserve, configured percentage and a 0.5% balance cap still apply. One unsettled attempt per channel; three confirmed losses pause betting for 24 hours. Changing settings restarts the miner.</p>
               </form>
             </div>
           </section>

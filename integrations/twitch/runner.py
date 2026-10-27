@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 import twitch_store as store
 import twitch_learning as learning
 import twitch_experiments as experiments
+import twitch_betting as betting
 from auth import credentials
 from prediction_timing import EarlyPredictions, prediction_open
 
@@ -51,10 +52,12 @@ def prediction_snapshot(event):
             choice = event.bet.get_decision().get("title")
         except (KeyError, IndexError, TypeError):
             choice = str(decision["choice"])
-    result = event.result.get("type")
+    stake = int(decision.get("amount", 0))
+    confirmed = bool(event.bet_confirmed and stake >= 10)
+    result = event.result.get("type") if confirmed else None
     return {"id": str(event.event_id), "channel": event.streamer.username,
             "title": event.title, "status": event.status, "choice": choice,
-            "stake": int(decision.get("amount", 0)), "confirmed": bool(event.bet_confirmed),
+            "stake": stake, "confirmed": confirmed,
             "result": result, "profit": int(event.result.get("gained", 0)) if result else None}
 
 
@@ -176,14 +179,19 @@ def main():
 
         Twitch.login = login
 
+        original_prediction = Twitch.make_predictions
+
         def paper_prediction(twitch, event):
-            """The active experiment has no path to upstream's real submitter."""
+            """Paper rules stay active; only explicitly enabled bounded pilots submit."""
             if STOP.is_set() or not prediction_open(event):
                 return
             try:
-                plan = experiments.execute(event, settings)
+                plan = betting.execute(event, settings,
+                    lambda selected: original_prediction(twitch, selected),
+                    Strategy.NUMBER_1, Strategy.NUMBER_2,
+                    lambda selected: not STOP.is_set() and prediction_open(selected))
                 if plan:
-                    log.info("Paper comparison for %s: %s", event.streamer.username, plan["reason"])
+                    log.info("Prediction for %s: %s", event.streamer.username, plan["reason"])
                 store.record_prediction(settings["username"], prediction_snapshot(event))
             except (ValueError, KeyError, TypeError, StopIteration, sqlite3.Error, OSError):
                 log.warning("Paper comparison waiting for usable market data on %s.", event.streamer.username)
@@ -211,6 +219,7 @@ def main():
                     event_data = event_message["data"]["event"]
                     learning.resolve_event(settings["username"], event_data)
                     experiments.resolve_event(settings["username"], event_data)
+                    betting.resolve_event(settings["username"], event_data)
                     event = websocket.events_predictions.get(event_data["id"])
                     if event is not None and event_data["status"] == "ACTIVE":
                         # Creation may have an empty pool. Every active update
@@ -221,13 +230,18 @@ def main():
                     return
                 prediction = event_message["data"]["prediction"]
                 event_id = prediction["event_id"]
+                if event_message["type"] == "prediction-made" or (
+                    event_message["type"] == "prediction-result" and prediction.get("result", {}).get("type") in ("WIN", "LOSE", "REFUND")
+                ):
+                    betting.confirm(settings["username"], event_id)
                 event = websocket.events_predictions.get(event_id)
                 if event is not None:
                     # Persist confirmation/results immediately, not just on the
                     # five-second timer, so a restart doesn't lose a confirmed bet.
                     store.record_prediction(settings["username"], prediction_snapshot(event))
                 if event_message["type"] == "prediction-result":
-                    store.resolve_prediction(settings["username"], event_id, prediction["result"])
+                    if store.resolve_prediction(settings["username"], event_id, prediction["result"]):
+                        betting.close(settings["username"], event_id)
             except (ValueError, KeyError, TypeError, OSError, sqlite3.Error):
                 log.warning("Could not record a prediction update.")
 
@@ -244,8 +258,8 @@ def main():
                 community_goals=False, chat=ChatPresence.NEVER,
                 bet=BetSettings(strategy=Strategy.SMART, percentage=settings["bet_percentage"],
                     max_points=min(settings["bet_max_points"], learning.MAX_STAKE),
-                    # Observe paper comparisons even at zero balance. The active
-                    # callback has no submitter and always sets the stake to zero.
+                    # Observe paper comparisons even at zero balance. The live
+                    # coordinator separately enforces reserves and stake caps.
                     minimum_points=-1,
                     # Preserve the actual closing deadline: FROM_START + zero
                     # causes upstream to reject events as already expired.

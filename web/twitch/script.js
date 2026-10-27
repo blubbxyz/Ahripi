@@ -59,7 +59,12 @@ function render(data) {
   $("session-start").textContent = date(worker.started_at);
   amount("today", known ? data.totals.today : null);
   amount("pending", betting.pending);
-  $("policy").textContent = data.policy.predictions ? "Paper only · 10 simulated points per rule" : "Prediction comparison off";
+  const live = data.live_betting;
+  const ruleNames = {most_voters:"Most voters",most_points:"Most points",least_points:"Least points"};
+  $("policy").textContent = live?.enabled ? `${ruleNames[live.strategy]} · 10 points max` : data.policy.predictions ? "Paper only · 10 simulated points per rule" : "Predictions off";
+  $("live-policy").textContent = live?.enabled
+    ? `Live pilot: ${ruleNames[live.strategy]} · ${live.stake} points per attempt · ${live.daily_budget}/day/channel · ${number(live.reserve)} reserve. ` + live.channels.map(channel => `${data.channels.find(row=>row.name===channel.name)?.display_name || channel.name}: ${channel.reserved_today} points reserved today, ${channel.pending} pending`).join("; ")
+    : "Real betting is off. All three rules continue as paper comparisons when predictions are enabled.";
 
   $("channels").replaceChildren(...data.channels.map(channel => {
     const row = node("tr");
@@ -92,20 +97,22 @@ function render(data) {
     const first = node("td"); first.append(node("strong", event.channel_display_name || event.channel), node("span", event.title, "channel-title"));
     const state = node("td");
     const closed = ["LOCKED", "RESOLVED", "CANCELED", "CANCELLED"].includes(event.status);
-    const comparison = event.paper_choices?.length && !event.confirmed;
-    const paper = comparison || (event.learning_mode === "paper" && !event.confirmed);
-    const label = comparison ? "Paper comparison" : paper ? (event.trial_outcome ? "Trial: " + event.trial_outcome.toLowerCase() : "Paper trial") : event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
+    const comparison = event.paper_choices?.length;
+    const attempted = event.bet_decision?.mode === "live";
+    const paper = !attempted && !event.confirmed && (comparison || event.learning_mode === "paper");
+    const label = event.result === "WIN" ? "Won" : event.result === "LOSE" ? "Lost" : event.result === "REFUND" ? "Refunded" : event.confirmed ? "Bet placed" : attempted ? "Live attempt (unconfirmed)" : comparison ? "Paper comparison" : paper ? (event.trial_outcome ? "Trial: " + event.trial_outcome.toLowerCase() : "Paper trial") : closed ? "Not placed" : event.choice ? "Considering" : "Observing";
     state.append(node("span", label, "badge " + (paper ? "badge-ghost" : event.result === "WIN" ? "badge-success" : event.result === "LOSE" ? "badge-error" : "badge-secondary")));
-    if (event.learning_reason) state.title = event.learning_reason;
+    if (event.bet_decision?.reason || event.learning_reason) state.title = event.bet_decision?.reason || event.learning_reason;
     const picks = node("td");
     if (comparison) {
+      if (attempted || event.confirmed) picks.append(node("strong", "Actual pick: " + (event.choice || "—"), "text-xs"));
       for (const choice of event.paper_choices) {
         const outcome = choice.result ? choice.result.toLowerCase() : "pending";
         const profit = choice.profit === null ? "" : ` · ${signed(choice.profit)} pts`;
         picks.append(node("div", `${choice.name}: ${choice.choice_title || "tie"} · ${outcome}${profit}`, "text-xs"));
       }
     } else picks.textContent = event.trial_choice || event.choice || "—";
-    row.append(first, picks, node("td", paper ? "0 (paper)" : event.confirmed && event.stake ? number(event.stake) : "—"), state,
+    row.append(first, picks, node("td", event.confirmed && event.stake ? number(event.stake) : attempted ? `${event.bet_decision.stake} reserved` : paper ? "0 (paper)" : "—"), state,
       node("td", event.profit === null ? "—" : signed(event.profit), event.profit > 0 ? "positive" : event.profit < 0 ? "negative" : ""), node("td", date(event.updated_at)));
     return row;
   });
@@ -178,6 +185,9 @@ async function loadSettings() {
   $("username").value = data.username;
   $("channel-list").value = data.channels.join("\n");
   $("enable-predictions").checked = data.predictions;
+  $("enable-live-betting").checked = !!data.live_betting;
+  $("bet-strategy").value = data.bet_strategy || "most_voters";
+  $("live-channels").value = (data.bet_channels || []).join("\n");
   $("bet-percentage").value = data.bet_percentage;
   $("bet-max").value = data.bet_max_points;
   $("bet-min").value = data.bet_min_balance;
@@ -226,7 +236,7 @@ $("logout").addEventListener("click", async () => {
 $("settings-form").addEventListener("submit", async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
   try {
-    const result = await api("/api/twitch/settings", {method:"POST",headers:{"Content-Type":"application/json","X-Ahripi-Request":"1"},body:JSON.stringify({username:$("username").value,channels:$("channel-list").value.split(/[\n,]+/).map(value=>value.trim()).filter(Boolean),predictions:$("enable-predictions").checked,bet_percentage:Number($("bet-percentage").value),bet_max_points:Number($("bet-max").value),bet_min_balance:Number($("bet-min").value)})});
+    const result = await api("/api/twitch/settings", {method:"POST",headers:{"Content-Type":"application/json","X-Ahripi-Request":"1"},body:JSON.stringify({username:$("username").value,channels:$("channel-list").value.split(/[\n,]+/).map(value=>value.trim()).filter(Boolean),predictions:$("enable-predictions").checked,live_betting:$("enable-live-betting").checked,bet_strategy:$("bet-strategy").value,bet_channels:$("live-channels").value.split(/[\n,]+/).map(value=>value.trim()).filter(Boolean),bet_percentage:Number($("bet-percentage").value),bet_max_points:Number($("bet-max").value),bet_min_balance:Number($("bet-min").value)})});
     $("settings-message").textContent = result.message;
   } catch(error) { $("settings-message").textContent = error.message; }
   finally { button.disabled = false; }
