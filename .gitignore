@@ -21,6 +21,7 @@ data/pi-cam/*.jpg
 Thumbs.db
 .vscode/
 .idea/
+.md
 
 # Local server orientation notes
 /AHRIPI_HELPER.md

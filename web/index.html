@@ -3,6 +3,7 @@
   <head>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="icon" href="/web/static/favicon.ico" type="image/x-icon">
     <meta charset="UTF-8">
     <link rel="stylesheet" href="style.css">
@@ -93,6 +94,9 @@
                 <span class="text-base-content/60">Temperature</span>
                 <span id="core_temp">--</span> °C
               </div>
+              <div class="mt-2" style="position:relative; height:80px;">
+                <canvas id="cpuChart"></canvas>
+              </div>
             </div>
           </div>
           <!-- /System Card -->
@@ -116,11 +120,11 @@
           <div class="card bg-base-200 shadow-xl w-96">
             <div class="card-body">
               <h2 class="card-title">Network</h2>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">RX</span>
                 <span id="rx">--</span> kbps
               </div>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">TX</span>
                 <span id="tx">--</span> kbps
               </div>
@@ -132,11 +136,11 @@
           <div class="card bg-base-200 shadow-xl w-96">
             <div class="card-body">
               <h2 class="card-title">Funny thingys</h2>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">Random Insult:</span>
                 <span id="insult">--</span>
               </div>
-              <div class="flex justify-between">
+              <div class="flex gap-4">
                 <span class="text-base-content/60">Random Quote:</span>
                 <span id="quote">--</span>
               </div>
@@ -148,15 +152,15 @@
           <div class="card bg-base-200 shadow-xl w-96">
             <div class="card-body">
               <h2 class="card-title">External Sensors (in the pi's room)</h2>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">humidity</span>
                 <span id="humidity">--</span> %
               </div>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">temperature</span>
                 <span id="temp">--</span> °C
               </div>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">air pressure</span>
                 <span id="pressure">--</span> Pa
               </div>
@@ -168,28 +172,28 @@
           <div class="card bg-base-200 shadow-xl w-96">
             <div class="card-body">
               <h2 class="card-title">Weather in <span id="city">--</span></h2>
-              <div class="flex justify-between">
+              <div class="flex gap-2">
                 <span class="text-base-content/60">Date:</span>
                 <span id="weather_current_date">--</span>
               </div>
-              <div class="flex justify-between">
-                <span class="text-base-content/60">Temperature</span>
+              <div class="flex gap-2">
+                <span class="text-base-content/60">Temperature:</span>
                 (H: <span id="current_high">--</span>° L: <span id="current_low">--</span>°)
               </div>
-              <div class="flex justify-between">
-                <span class="text-base-content/60">Condition</span>
+              <div class="flex gap-2">
+                <span class="text-base-content/60">Condition:</span>
                 <span id="weather_condition">--</span>
               </div>
               <h4>Forecast - Next 2 Days</h4>
-              <div class="flex justify-between">
-                <span class="text-base-content/60"><strong><span id="forecast_day1_date">Day 1</span>:</strong></span>
+              <div class="flex gap-2">
+                <span class="text-base-content/60"><span id="forecast_day1_date">Day 1</span>:</span>
                 <span id="forecast_day1_temp">--</span> °C
                 (H: <span id="forecast_day1_high">--</span>° L: <span id="forecast_day1_low">--</span>°)
               </div>
-              <div class="flex justify-between">
-                <span class="text-base-content/60"><strong><span id="forecast_day2_date">Day 2</span>:</strong></span>
+              <div class="flex gap-2">
+                <span class="text-base-content/60"><span id="forecast_day2_date">Day 2</span>:</span>
                 <span id="forecast_day2_temp">--</span> °C
-                (H: <span id="forecast_day2_high">--</span>° L: <span id="forecast_day2_low">--</span>°)
+                (H: <span id="forecast_day2_high">--</span>° L:<span id="forecast_day2_low">--</span>°)
               </div>
             </div>
           </div>

@@ -295,12 +295,62 @@ document.getElementById("adminPassword")?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") adminLogin();
 });
 
+// ===== CHARTS =====
+
+let cpuChart = null;
+
+async function loadCpuChart() {
+    const data = await fetch("/api/history?sensor=cpu&range=30m").then(r => r.json());
+
+    // take every 10th point so the line isn't a solid wall of noise
+    const sampled = data.filter((_, i) => i % 10 === 0);
+    const labels = sampled.map(d => d.time);
+    const values = sampled.map(d => d.value);
+
+    if (cpuChart) {
+        cpuChart.data.labels = labels;
+        cpuChart.data.datasets[0].data = values;
+        cpuChart.update();
+        return;
+    }
+
+    const color = getComputedStyle(document.documentElement)
+        .getPropertyValue("--color-primary").trim() || "#888";
+
+    cpuChart = new Chart(document.getElementById("cpuChart"), {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "CPU %",
+                data: values,
+                borderColor: `oklch(${color})`,
+                backgroundColor: `oklch(${color} / 0.1)`,
+                fill: true,
+                borderWidth: 1.5,
+                pointRadius: 0,
+                tension: 0.3,
+            }]
+        },
+        options: {
+            animation: false,
+            maintainAspectRatio: false,
+            scales: {
+                x: { display: false },
+                y: { min: 0, max: 100, grid: { color: "rgba(255,255,255,0.05)" } }
+            },
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
 // ===== INIT =====
 
 refreshAdminState();
 loadLatestPhoto();
 loadComments();
 update();
+loadCpuChart();
 
 setInterval(loadComments, 10000);
 setInterval(update, 1000);
